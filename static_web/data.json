@@ -1,0 +1,91 @@
+{
+    "groups": [
+        {
+            "name": "常用文档",
+            "items": [
+                {
+                    "type": "link",
+                    "title": "NXP S32",
+                    "desc": "MPC5744P 相关资源",
+                    "url": "https://www.nxp.com",
+                    "tags": [
+                        "nxp",
+                        "ref"
+                    ]
+                },
+                {
+                    "type": "link",
+                    "title": "STM32 HAL",
+                    "desc": "ST 官方文档入口",
+                    "url": "https://www.st.com",
+                    "tags": [
+                        "stm32",
+                        "ref"
+                    ]
+                }
+            ]
+        },
+        {
+            "name": "工具 & 站点",
+            "items": [
+                {
+                    "type": "link",
+                    "title": "GitHub",
+                    "desc": "代码托管",
+                    "url": "https://github.com",
+                    "tags": [
+                        "dev"
+                    ]
+                },
+                {
+                    "type": "link",
+                    "title": "Vector",
+                    "desc": "CAN/诊断工具",
+                    "url": "https://www.vector.com",
+                    "tags": [
+                        "CAN"
+                    ]
+                }
+            ]
+        },
+        {
+            "name": "小工具",
+            "items": [
+                {
+                    "type": "link",
+                    "title": "Mini-DBC",
+                    "desc": "简易DBC离线网页",
+                    "url": "https://github.com",
+                    "tags": [
+                        "dev", "CAN"
+                    ]
+                },
+                {
+                    "type": "link",
+                    "title": "bund-rate",
+                    "desc": "简易波特率计算离线网页",
+                    "url": "https://github.com",
+                    "tags": [
+                        "dev","Bund-Rate"
+                    ]
+                }
+            ]
+        },
+        {
+            "name": "代码片段",
+            "items": [
+                {
+                    "type": "code",
+                    "title": "HAL CAN 初始化模板",
+                    "desc": "bxCAN 初始化示例",
+                    "lang": "c",
+                    "code": "/* STM32 HAL CAN init (bxCAN) */\nhcan.Init.Prescaler = 6;\nhcan.Init.Mode = CAN_MODE_NORMAL;\nhcan.Init.SyncJumpWidth = CAN_SJW_1TQ;\nhcan.Init.TimeSeg1 = CAN_BS1_13TQ;\nhcan.Init.TimeSeg2 = CAN_BS2_2TQ;\n/* HAL_CAN_Init(&hcan); */",
+                    "tags": [
+                        "stm32",
+                        "can"
+                    ]
+                }
+            ]
+        }
+    ]
+}

@@ -1,0 +1,249 @@
+<!--
+  CAN Bitrate Calculator (HTML+CSS+JS)
+  功能: 计算和搜索 CAN 波特率配置 (支持 generic / bxCAN)
+  项目发起: zxt
+  共同开发: ChatGPT (OpenAI)
+
+  日期: 2025-08-13
+  许可: MIT License
+-->
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>CAN Bitrate Calculator (HTML+CSS+JS)</title>
+  <link rel="stylesheet" href="style.css" />
+</head>
+<body>
+<header class="container">
+  <h1>CAN Bitrate Calculator</h1>
+  <p class="sub">离线可用 · generic / bxCAN 双模式 · 计算 & 搜索 · CSV 导出</p>
+</header>
+
+<main class="container">
+  <section class="card">
+    <div class="row">
+      <div class="col">
+        <label for="mode">模式</label>
+        <select id="mode">
+          <option value="generic" selected>generic（Tprop/Tseg1/Tseg2）</option>
+          <option value="bxcan">bxCAN（BS1/BS2）</option>
+        </select>
+      </div>
+      <div class="col">
+        <label for="clk">CAN 内核时钟 (Hz)</label>
+        <input id="clk" type="number" value="42000000" min="1" step="1" />
+        <div class="hint">
+          常用：42MHz(STM32F4 APB1/2 分频后)、48MHz、54MHz…
+          <button class="pill" data-preset="42000000">42M</button>
+          <button class="pill" data-preset="48000000">48M</button>
+          <button class="pill" data-preset="54000000">54M</button>
+        </div>
+      </div>
+    </div>
+
+    <div id="row-generic" class="row">
+      <div class="col">
+        <label for="div">分频 DIV</label>
+        <input id="div" type="number" value="6" min="1" max="1024" step="1" />
+      </div>
+      <div class="col">
+        <label for="tprop">Tprop (TQ)</label>
+        <input id="tprop" type="number" value="1" min="0" max="8" step="1" />
+      </div>
+      <div class="col">
+        <label for="tseg1">Tseg1 (TQ)</label>
+        <input id="tseg1" type="number" value="12" min="1" max="16" step="1" />
+      </div>
+      <div class="col">
+        <label for="tseg2">Tseg2 (TQ)</label>
+        <input id="tseg2" type="number" value="2" min="1" max="8" step="1" />
+      </div>
+      <div class="col">
+        <label for="sjw">SJW (TQ)</label>
+        <input id="sjw" type="number" value="1" min="1" max="4" step="1" />
+      </div>
+    </div>
+
+    <div id="row-bxcan" class="row hidden">
+      <div class="col">
+        <label for="div_bx">分频 DIV</label>
+        <input id="div_bx" type="number" value="6" min="1" max="1024" step="1" />
+      </div>
+      <div class="col">
+        <label for="bs1">BS1 (TQ)</label>
+        <input id="bs1" type="number" value="13" min="1" max="16" step="1" />
+      </div>
+      <div class="col">
+        <label for="bs2">BS2 (TQ)</label>
+        <input id="bs2" type="number" value="2" min="1" max="8" step="1" />
+      </div>
+      <div class="col">
+        <label for="sjw_bx">SJW (TQ)</label>
+        <input id="sjw_bx" type="number" value="1" min="1" max="4" step="1" />
+      </div>
+    </div>
+
+    <div class="row">
+      <div class="col col-actions">
+        <button id="btn-calc" class="primary">计算</button>
+        <span id="calc-error" class="error"></span>
+      </div>
+    </div>
+
+    <div id="calc-out" class="grid-out">
+      <div><span class="k">TQ (ns)</span><span id="tq_ns" class="v">—</span></div>
+      <div><span class="k">TQ 总数</span><span id="tq_total" class="v">—</span></div>
+      <div><span class="k">Bitrate (bps)</span><span id="bitrate" class="v">—</span></div>
+      <div><span class="k">采样点 (%)</span><span id="sample" class="v">—</span></div>
+    </div>
+  </section>
+
+  <section class="card">
+    <h2>搜索配置（根据目标 Bitrate / 采样点）</h2>
+
+    <div class="row">
+      <div class="col">
+        <label for="target_br">目标 Bitrate (bps)</label>
+        <input id="target_br" type="number" value="500000" min="1" step="1" />
+      </div>
+      <div class="col">
+        <label for="target_sp">目标采样点 (0..1，可选)</label>
+        <input id="target_sp" type="number" value="0.875" min="0" max="1" step="0.001" />
+        <div class="hint">留空代表不限制采样点</div>
+      </div>
+      <div class="col">
+        <label for="topk">显示前 K 项</label>
+        <input id="topk" type="number" value="20" min="1" max="200" step="1" />
+      </div>
+    </div>
+
+    <div id="srch-generic" class="row">
+      <div class="col">
+        <label>DIV 范围</label>
+        <div class="range">
+          <input id="g_div_lo" type="number" value="1" min="1" max="1024" />
+          <span>—</span>
+          <input id="g_div_hi" type="number" value="64" min="1" max="1024" />
+        </div>
+      </div>
+      <div class="col">
+        <label>Tprop 范围</label>
+        <div class="range">
+          <input id="g_prop_lo" type="number" value="0" min="0" max="8" />
+          <span>—</span>
+          <input id="g_prop_hi" type="number" value="2" min="0" max="8" />
+        </div>
+      </div>
+      <div class="col">
+        <label>Tseg1 范围</label>
+        <div class="range">
+          <input id="g_seg1_lo" type="number" value="1" min="1" max="16" />
+          <span>—</span>
+          <input id="g_seg1_hi" type="number" value="16" min="1" max="16" />
+        </div>
+      </div>
+      <div class="col">
+        <label>Tseg2 范围</label>
+        <div class="range">
+          <input id="g_seg2_lo" type="number" value="1" min="1" max="8" />
+          <span>—</span>
+          <input id="g_seg2_hi" type="number" value="8" min="1" max="8" />
+        </div>
+      </div>
+      <div class="col">
+        <label>SJW 范围</label>
+        <div class="range">
+          <input id="g_sjw_lo" type="number" value="1" min="1" max="4" />
+          <span>—</span>
+          <input id="g_sjw_hi" type="number" value="2" min="1" max="4" />
+        </div>
+      </div>
+    </div>
+
+    <div id="srch-bxcan" class="row hidden">
+      <div class="col">
+        <label>DIV 范围</label>
+        <div class="range">
+          <input id="b_div_lo" type="number" value="1" min="1" max="1024" />
+          <span>—</span>
+          <input id="b_div_hi" type="number" value="64" min="1" max="1024" />
+        </div>
+      </div>
+      <div class="col">
+        <label>BS1 范围</label>
+        <div class="range">
+          <input id="b_bs1_lo" type="number" value="1" min="1" max="16" />
+          <span>—</span>
+          <input id="b_bs1_hi" type="number" value="16" min="1" max="16" />
+        </div>
+      </div>
+      <div class="col">
+        <label>BS2 范围</label>
+        <div class="range">
+          <input id="b_bs2_lo" type="number" value="1" min="1" max="8" />
+          <span>—</span>
+          <input id="b_bs2_hi" type="number" value="8" min="1" max="8" />
+        </div>
+      </div>
+      <div class="col">
+        <label>SJW 范围</label>
+        <div class="range">
+          <input id="b_sjw_lo" type="number" value="1" min="1" max="4" />
+          <span>—</span>
+          <input id="b_sjw_hi" type="number" value="2" min="1" max="4" />
+        </div>
+      </div>
+    </div>
+
+    <div class="row">
+      <div class="col col-actions">
+        <button id="btn-search" class="primary">搜索</button>
+        <button id="btn-export" class="ghost" disabled>导出 CSV</button>
+        <span id="search-error" class="error"></span>
+      </div>
+    </div>
+
+    <div class="table-wrap">
+      <table id="result-table">
+        <thead>
+          <tr id="thead-row"></tr>
+        </thead>
+        <tbody id="tbody"></tbody>
+      </table>
+    </div>
+  </section>
+  <section class="card">
+  <h2>帮助 / 公式说明</h2>
+  <p>本工具可计算和搜索 CAN 控制器的波特率配置。</p>
+  <ul>
+    <li><strong>generic 模式</strong>:
+      <br>Bitrate = CAN_Clk / (Prescaler × (1 + Tprop + Tseg1 + Tseg2))
+      <br>SamplePoint = (1 + Tprop + Tseg1) / (1 + Tprop + Tseg1 + Tseg2)
+    </li>
+    <li><strong>bxCAN 模式</strong>:
+      <br>Bitrate = CAN_Clk / (Prescaler × (1 + BS1 + BS2))
+      <br>SamplePoint = (1 + BS1) / (1 + BS1 + BS2)
+    </li>
+  </ul>
+  <p>参数解释：</p>
+  <ul>
+    <li>CAN_Clk: CAN 外设输入时钟频率 (Hz)</li>
+    <li>Prescaler: 分频系数 (DIV)</li>
+    <li>Tprop: 传播段 (TQ)</li>
+    <li>Tseg1/Tseg2: 相位段 (TQ)</li>
+    <li>SJW: 同步跳转宽度 (TQ)</li>
+    <li>BS1/BS2: bxCAN 控制器的相位段配置 (BS1 = Tprop + Tseg1)</li>
+  </ul>
+</section>
+
+</main>
+
+<footer class="container foot">
+  <span>© CAN Bitrate Calculator · Vanilla JS</span>
+</footer>
+
+<script src="app.js"></script>
+</body>
+</html>

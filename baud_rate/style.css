@@ -1,0 +1,124 @@
+/*
+  CAN Bitrate Calculator 样式表
+  项目发起: zxt
+  共同开发: ChatGPT (OpenAI)
+  日期: 2025-08-13
+  许可: MIT License
+*/
+
+:root{
+  --bg:#0b0d12;
+  --card:#111521;
+  --ink:#e8ecf2;
+  --muted:#9aa4b2;
+  --accent:#7aa2ff;
+  --accent-2:#00d1b2;
+  --danger:#ff6b6b;
+  --border:#1d2433;
+}
+
+*{box-sizing:border-box}
+html,body{height:100%}
+body{
+  margin:0;
+  font-family:system-ui,-apple-system,Segoe UI,Roboto,Helvetica,Arial,"PingFang SC","Microsoft YaHei",sans-serif;
+  background:linear-gradient(180deg,#0b0d12,#0a0e17);
+  color:var(--ink);
+}
+.container{max-width:1100px;margin:0 auto;padding:20px}
+
+header h1{margin:0 0 6px 0;font-size:28px}
+.sub{color:var(--muted);margin:0}
+
+.card{
+  background:var(--card);
+  border:1px solid var(--border);
+  border-radius:16px;
+  padding:16px;
+  margin-top:18px;
+  box-shadow:0 10px 24px rgba(0,0,0,.25);
+}
+
+.row{
+  display:flex;
+  flex-wrap:wrap;
+  gap:12px;
+  margin-bottom:12px;
+}
+.col{
+  flex:1 1 200px;
+  min-width:200px;
+}
+.col-actions{
+  display:flex;
+  align-items:flex-end;
+  gap:10px;
+}
+
+label{display:block;margin-bottom:6px;color:var(--muted);font-size:13px}
+input,select,button{
+  width:100%;
+  padding:10px 12px;
+  border-radius:10px;
+  border:1px solid var(--border);
+  background:#0f1420;
+  color:var(--ink);
+  outline:none;
+}
+input:focus,select:focus{border-color:var(--accent)}
+button{
+  cursor:pointer;
+  transition:.15s transform ease,.15s background ease;
+}
+button.primary{
+  background:linear-gradient(135deg,var(--accent),#5b7dff);
+  border:none;
+  font-weight:600;
+}
+button.primary:hover{transform:translateY(-1px)}
+button.ghost{
+  background:transparent;
+  border:1px dashed var(--border);
+}
+button.pill{
+  width:auto;
+  padding:4px 10px;
+  border-radius:999px;
+  border:1px solid var(--border);
+  background:#0e1420;
+  color:var(--muted);
+  margin-left:6px;
+  font-size:12px;
+}
+.hint{margin-top:6px;color:var(--muted);font-size:12px}
+
+.error{color:var(--danger);margin-left:8px}
+
+.grid-out{
+  display:grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap:12px;
+  margin-top:6px;
+}
+.grid-out .k{display:block;color:var(--muted);font-size:12px}
+.grid-out .v{
+  display:block;
+  font-variant-numeric:tabular-nums;
+  font-size:18px;
+  margin-top:2px;
+}
+
+.range{display:flex;gap:8px;align-items:center}
+.range span{color:var(--muted)}
+
+.table-wrap{
+  margin-top:12px;overflow:auto;border-radius:12px;border:1px solid var(--border)
+}
+table{width:100%;border-collapse:collapse;background:#0b111b}
+thead{background:#0f1625}
+th,td{padding:10px 12px;border-bottom:1px solid var(--border);text-align:left;white-space:nowrap}
+tbody tr:hover{background:#0e1626}
+
+.hidden{display:none}
+
+.foot{color:var(--muted);font-size:12px;text-align:center}

@@ -1,0 +1,30 @@
+/* 轻量自定义：不使用 CSS 变量，保证兼容 */
+body{background:#f6f7fb}
+
+/* 让侧栏跟随滚动顶部导航留出空间 */
+.sticky-sidebar{position:sticky; top:70px}
+
+/* 消息列表视觉更清晰 */
+#msgList .list-group-item{cursor:pointer}
+#msgList .list-group-item small{color:#6c757d}
+
+/* 表格里输入使用 Bootstrap 小尺寸 */
+#sigGrid input[type="text"],
+#sigGrid input[type="number"],
+#sigGrid select{
+  min-width:60px;
+}
+
+/* 紧凑模式：整体再缩一档 */
+body.compact{font-size:12px}
+body.compact .form-control,
+body.compact .form-select{padding:.2rem .35rem; font-size:.82rem}
+body.compact .table{font-size:.82rem}
+
+/* 错误浮层 */
+.err-overlay{
+  display:none; position:fixed; left:0; right:0; bottom:0;
+  background:rgba(220,0,0,.95); color:#fff; padding:10px 12px;
+  font:13px/1.5 ui-monospace,Menlo,Consolas,monospace;
+  white-space:pre-wrap; z-index:99999
+}

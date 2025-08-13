@@ -1,0 +1,99 @@
+<!--
+  XT · 导航（拆分版）
+  功能: 静态网址导航 / 代码片段展示 / 标签筛选 / 搜索 / 置顶收藏 / JSON配置 / 导入导出
+  项目发起: zhangxt
+  共同开发: ChatGPT (OpenAI)
+  日期: 2025-08-13
+  许可: MIT License
+-->
+<!DOCTYPE html>
+<html lang="zh-CN" data-theme="light">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>XT · 导航</title>
+  <link rel="stylesheet" href="style.css" />
+</head>
+<body>
+<header class="container">
+  <h1>XT · 导航 <span class="sub">嵌入式 / STM32 / MBD / CAN / 车载开发</span></h1>
+
+  <div class="toolbar card">
+    <input id="q" type="search" placeholder="搜索标题/描述/标签（Ctrl+/）" />
+    <select id="filter">
+      <option value="">按标签筛选…</option>
+    </select>
+    <select id="sort">
+      <option value="pin,name">排序：置顶→名称</option>
+      <option value="pin,group">排序：置顶→分组</option>
+      <option value="group,name">排序：分组→名称</option>
+    </select>
+    <button id="btn-theme">主题</button>
+    <button id="btn-import">导入 JSON</button>
+    <button id="btn-export">导出 JSON</button>
+    <button id="btn-clearpin">清除置顶</button>
+    <span id="data-src" class="muted">数据来源：尝试 data.json → 内置</span>
+  </div>
+</header>
+
+<main class="container" id="app">
+  <!-- 分组内容容器 -->
+</main>
+
+<section class="container card">
+  <h2>帮助 / 数据格式</h2>
+  <p class="muted">本页为纯静态单站，无后端。建议部署到 GitHub Pages/静态空间；支持三种加载方式：同目录 <code>data.json</code>、URL 参数 <code>?data=</code>、手动导入 JSON。</p>
+  <h3>JSON Schema（简版）</h3>
+  <pre><code>{
+  "groups":[
+    {"name":"常用文档","items":[
+      {"type":"link","title":"NXP S32","desc":"MPC5744P 相关资源","url":"https://www.nxp.com", "tags":["nxp","ref"]},
+      {"type":"code","title":"HAL CAN 初始化模板","desc":"bxCAN 初始化示例","lang":"c","code":"/* ... */","tags":["stm32","can"]}
+    ]},
+    {"name":"工具 & 站点","items":[ ... ]}
+  ]
+}</code></pre>
+</section>
+
+<footer class="container foot">
+  <span>© XT · 导航 · XT & ChatGPT</span>
+</footer>
+
+<!-- 可选：内置默认数据（加载 data.json 失败时使用） -->
+<script id="nav-data" type="application/json">
+{
+  "groups": [
+    {
+      "name": "常用文档",
+      "items": [
+        {"type":"link","title":"NXP S32","desc":"MPC5744P 相关资源","url":"https://www.nxp.com","tags":["nxp","ref"]},
+        {"type":"link","title":"STM32 HAL","desc":"ST 官方文档入口","url":"https://www.st.com","tags":["stm32","ref"]}
+      ]
+    },
+    {
+      "name": "工具 & 站点",
+      "items": [
+        {"type":"link","title":"GitHub","desc":"代码托管","url":"https://github.com","tags":["dev"]},
+        {"type":"link","title":"Vector","desc":"CAN/诊断工具","url":"https://www.vector.com","tags":["can"]}
+      ]
+    },
+    {
+      "name": "代码片段",
+      "items": [
+        {
+          "type":"code",
+          "title":"HAL CAN 初始化模板",
+          "desc":"bxCAN 初始化示例",
+          "lang":"c",
+          "code":"/* STM32 HAL CAN init (bxCAN) */\nhcan.Init.Prescaler = 6;\nhcan.Init.Mode = CAN_MODE_NORMAL;\nhcan.Init.SyncJumpWidth = CAN_SJW_1TQ;\nhcan.Init.TimeSeg1 = CAN_BS1_13TQ;\nhcan.Init.TimeSeg2 = CAN_BS2_2TQ;\n/* HAL_CAN_Init(&hcan); */",
+          "tags":["stm32","can"]
+        }
+      ]
+    }
+  ]
+}
+</script>
+
+<script src="app.js"></script>
+</body>
+</html>
