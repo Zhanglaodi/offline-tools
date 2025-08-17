@@ -5,23 +5,18 @@
   <meta http-equiv="x-ua-compatible" content="IE=edge">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>DBC Mini Editor</title>
-  <!-- Bootstrap -->
   <link href="bootstrap.min.css" rel="stylesheet">
-  <!-- 你自己的样式 -->
   <link rel="stylesheet" href="styles.css">
 </head>
 <body>
 <nav class="navbar navbar-expand-lg bg-white border-bottom sticky-top">
   <div class="container-fluid">
     <span class="navbar-brand fw-bold">DBC Mini Editor</span>
-
     <div class="d-flex flex-wrap gap-2 align-items-center ms-auto">
       <button id="btnNewMsg" class="btn btn-primary btn-sm">新建消息</button>
       <button id="btnNewSig" class="btn btn-outline-primary btn-sm">添加信号</button>
       <button id="btnDelMsg" class="btn btn-outline-danger btn-sm">删除消息</button>
-
       <div class="vr mx-1 d-none d-md-block"></div>
-
       <div class="input-group input-group-sm">
         <span class="input-group-text">导入编码</span>
         <select id="selImportEnc" class="form-select form-select-sm">
@@ -31,7 +26,6 @@
         </select>
         <input id="fileImport" type="file" class="form-control form-control-sm" accept=".dbc">
       </div>
-
       <div class="input-group input-group-sm">
         <span class="input-group-text">导出编码</span>
         <select id="selExportEnc" class="form-select form-select-sm">
@@ -40,7 +34,6 @@
         </select>
         <button id="btnExport" class="btn btn-success btn-sm">导出 DBC</button>
       </div>
-
       <button id="btnToggleDensity" class="btn btn-outline-secondary btn-sm">紧凑模式</button>
     </div>
   </div>
@@ -48,7 +41,6 @@
 
 <div class="container-fluid py-3">
   <div class="row g-3">
-    <!-- 左侧：节点/消息/值表 -->
     <div class="col-12 col-lg-3 col-xl-2">
       <div class="sticky-sidebar">
         <div class="card mb-3">
@@ -60,12 +52,10 @@
             <div id="nodeList" class="text-muted small">ECU Vector__XXX</div>
           </div>
         </div>
-
         <div class="card mb-3">
           <div class="card-header py-2">消息列表</div>
           <div class="list-group list-group-flush" id="msgList"></div>
         </div>
-
         <div class="card mb-3">
           <div class="card-header py-2">值表 (VAL_TABLE_)</div>
           <div class="card-body">
@@ -79,8 +69,6 @@
         </div>
       </div>
     </div>
-
-    <!-- 右侧：项目/消息编辑/预览 -->
     <div class="col-12 col-lg-9 col-xl-10">
       <div class="card mb-3">
         <div class="card-header py-2">项目信息</div>
@@ -91,54 +79,27 @@
           </div>
         </div>
       </div>
-
       <div class="card mb-3" id="msgEditor" style="display:none">
         <div class="card-header py-2">消息编辑</div>
         <div class="card-body">
           <div class="row g-2 mb-2">
-            <div class="col-sm-3">
-              <label class="form-label form-label-sm">CAN ID</label>
-              <input id="mCanId" type="text" class="form-control form-control-sm" placeholder="十进制或 0x...">
-            </div>
-            <div class="col-sm-3">
-              <label class="form-label form-label-sm">名称</label>
-              <input id="mName" type="text" class="form-control form-control-sm">
-            </div>
-            <div class="col-sm-2">
-              <label class="form-label form-label-sm">DLC</label>
-              <input id="mDlc" type="number" min="0" max="8" class="form-control form-control-sm" value="8">
-            </div>
-            <div class="col-sm-2">
-              <label class="form-label form-label-sm">发送节点</label>
-              <input id="mTx" type="text" class="form-control form-control-sm" value="ECU">
-            </div>
-            <div class="col-sm-2">
-              <label class="form-label form-label-sm">扩展帧</label>
-              <select id="mExt" class="form-select form-select-sm">
-                <option value="0">否</option><option value="1">是</option>
-              </select>
-            </div>
-            <div class="col-12">
-              <label class="form-label form-label-sm">备注 (CM_)</label>
-              <input id="mComment" type="text" class="form-control form-control-sm" placeholder="导出为 CM_ BO_ ...">
-            </div>
+            <div class="col-sm-3"><label class="form-label form-label-sm">CAN ID</label><input id="mCanId" type="text" class="form-control form-control-sm"></div>
+            <div class="col-sm-3"><label class="form-label form-label-sm">名称</label><input id="mName" type="text" class="form-control form-control-sm"></div>
+            <div class="col-sm-2"><label class="form-label form-label-sm">DLC</label><input id="mDlc" type="number" min="0" max="8" class="form-control form-control-sm" value="8"></div>
+            <div class="col-sm-2"><label class="form-label form-label-sm">发送节点</label><input id="mTx" type="text" class="form-control form-control-sm" value="ECU"></div>
+            <div class="col-sm-2"><label class="form-label form-label-sm">扩展帧</label><select id="mExt" class="form-select form-select-sm"><option value="0">否</option><option value="1">是</option></select></div>
+            <div class="col-12"><label class="form-label form-label-sm">备注 (CM_)</label><input id="mComment" type="text" class="form-control form-control-sm"></div>
           </div>
-
           <div class="table-responsive">
             <table class="table table-bordered table-sm align-middle mb-0" id="sigGrid">
               <thead class="table-light">
-              <tr>
-                <th>信号名</th><th>start</th><th>len</th><th>端序</th><th>符号</th>
-                <th>factor</th><th>offset</th><th>min</th><th>max</th><th>unit</th>
-                <th>接收</th><th>值表</th><th>备注</th><th>操作</th>
-              </tr>
+                <tr><th>信号名</th><th>start</th><th>len</th><th>端序</th><th>符号</th><th>factor</th><th>offset</th><th>min</th><th>max</th><th>unit</th><th>接收</th><th>值表</th><th>备注</th><th>操作</th></tr>
               </thead>
               <tbody></tbody>
             </table>
           </div>
         </div>
       </div>
-
       <div class="card">
         <div class="card-header py-2">导出预览</div>
         <div class="card-body">
@@ -149,13 +110,9 @@
     </div>
   </div>
 </div>
-
-<!-- 错误浮层 -->
 <div id="errOverlay" class="err-overlay" aria-live="polite"></div>
 <script src="jquery.min.js"></script>
-<!-- Bootstrap JS（可选，用于交互组件） -->
 <script src="bootstrap.min.js"></script>
-<!-- 你的业务脚本 -->
 <script src="app.js" defer></script>
 </body>
 </html>
