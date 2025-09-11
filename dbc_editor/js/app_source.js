@@ -15,7 +15,7 @@
     function withBOM(u8) { var out = new Uint8Array(u8.length + 3); out[0] = 0xEF; out[1] = 0xBB; out[2] = 0xBF; out.set(u8, 3); return out; }
     function stripBOM(s) { return s.replace(/^\uFEFF/, ''); }
 
-    /* ===== 数据模型（ES5 兼容） ===== */
+    /* ===== 数据模型 ===== */
     function Signal() {
         this.name = ''; this.start = 0; this.len = 1; this.le = true; this.signed = false;
         this.factor = 1; this.offset = 0; this.min = 0; this.max = 0; this.unit = '';
@@ -39,6 +39,8 @@
     function Project() { this.version = '1.0'; this.nodes = ['ECU', 'Vector__XXX']; this.messages = []; this.valueTables = {}; }
     Project.prototype.addNode = function (n) { if (n && this.nodes.indexOf(n) < 0) this.nodes.push(n); };
     Project.prototype.addMessage = function (m) { this.messages.push(m); this.addNode(m.tx); };
+
+    // 导出顺序
     Project.prototype.toDBC = function () {
         var NS = ["NS_DESC_", "CM_", "BA_DEF_", "BA_", "VAL_", "CAT_DEF_", "CAT_", "FILTER", "BA_DEF_DEF_", "EV_DATA_", "ENVVAR_DATA_", "SGTYPE_", "SGTYPE_VAL_", "BA_DEF_SGTYPE_", "BA_SGTYPE_", "SIG_TYPE_REF_", "VAL_TABLE_", "SIG_GROUP_", "SIG_VALTYPE_", "SIGTYPE_VALTYPE_", "BO_TX_BU_", "BA_DEF_REL_", "BA_REL_", "BA_DEF_DEF_REL_", "BU_SG_REL_", "BU_EV_REL_", "BU_BO_REL_", "SG_MUL_VAL_"];
         var lines = [], i, j, k, t, m, s, items, parts;
@@ -53,14 +55,14 @@
         lines.push('BU_: ' + this.nodes.join(' '));
         lines.push('');
 
-        // === 关键调整：VAL_TABLE_ 紧跟在 BU_ 后面 ===
+        // VAL_TABLE_
         for (var name in this.valueTables) {
             if (!this.valueTables.hasOwnProperty(name)) continue;
             items = this.valueTables[name] || []; parts = [];
             for (k = 0; k < items.length; k++) parts.push(items[k][0] + ' "' + escQuote(items[k][1]) + '"');
             lines.push('VAL_TABLE_ ' + name + ' ' + parts.join(' ') + ' ;');
         }
-        if (Object.keys(this.valueTables).length) lines.push(''); // 空行分隔
+        if (Object.keys(this.valueTables).length) lines.push('');
 
         // 消息与信号
         for (j = 0; j < this.messages.length; j++) {
@@ -78,7 +80,7 @@
             }
         }
 
-        // VAL_：仍按“展开数值对”的形式输出（兼容性最好）
+        // VAL_
         for (j = 0; j < this.messages.length; j++) {
             m = this.messages[j];
             for (k = 0; k < m.signals.length; k++) {
@@ -104,17 +106,67 @@
         return [rawMin * factor + offset, rawMax * factor + offset];
     }
 
-    /* ===== 解析（兼容写法） ===== */
-    function parseDBCIntoProject(text, projOut) {
-        projOut.messages.length = 0; projOut.nodes = ['ECU', 'Vector__XXX']; projOut.valueTables = {};
+    /* ===== 解析 ===== */
+    // 1) 把文本切成“语句”（引号外遇到 ; 才结束；没有 ; 的行式语句则用换行结束）
+    function splitDBCIntoStatements(text) {
+        const stmts = [];
+        let cur = '';
+        let inQuote = false;
 
-        var lines = text.split(/\r?\n/);
+        for (let i = 0; i < text.length; i++) {
+            const ch = text[i];
+            const prev = text[i - 1];
+
+            // 进入/退出引号（支持 \" 转义）
+            if (ch === '"' && prev !== '\\') {
+                inQuote = !inQuote;
+                cur += ch;
+                continue;
+            }
+
+            // 引号外遇到 ; ：结束一条“语句”
+            if (ch === ';' && !inQuote) {
+                cur += ch;
+                if (cur.trim()) stmts.push(cur.trim());
+                cur = '';
+                continue;
+            }
+
+            // 对于没有 ; 的行式规则（如 BO_/SG_/BU_/VERSION），引号外的换行也结束
+            if ((ch === '\n' || ch === '\r') && !inQuote) {
+                if (cur.trim()) {
+                    stmts.push(cur.trim());
+                    cur = '';
+                }
+                continue;
+            }
+
+            cur += ch;
+        }
+
+        if (cur.trim()) stmts.push(cur.trim());
+        return stmts;
+    }
+
+    // 2) 解析入口：用“语句”而不是“行”，并让 CM_ 的正则可跨行
+    function parseDBCIntoProject(text, projOut) {
+        projOut.messages.length = 0;
+        projOut.nodes = ['ECU', 'Vector__XXX'];
+        projOut.valueTables = {};
+
+        // 改为按“语句”遍历
+        var lines = splitDBCIntoStatements(text);
+
+        // 原有正则
         var reBO = /^\s*BO_\s+(\d+)\s+([A-Za-z_][\w]*)\s*:\s*(\d+)\s+([A-Za-z_][\w]*)/;
         var reSG = /^\s*SG_\s+([A-Za-z_][\w]*)\s*:\s*(\d+)\|(\d+)\@([01])([+-])\s*\(([-+]?[\d.]+),\s*([-+]?[\d.]+)\)\s*\[([-+]?[\d.]+)\|([-+]?[\d.]+)\]\s*"([^"]*)"\s+(.+)\s*$/;
         var reBU = /^\s*BU_:\s*(.*)$/;
         var reVER = /^\s*VERSION\s+"(.*)"\s*$/;
-        var reCM_BO = /^\s*CM_\s+BO_\s+(\d+)\s+"(.*)"\s*;\s*$/;
-        var reCM_SG = /^\s*CM_\s+SG_\s+(\d+)\s+([A-Za-z_][\w]*)\s+"(.*)"\s*;\s*$/;
+
+        // 允许注释字符串跨多行（非贪婪）
+        var reCM_BO = /^\s*CM_\s+BO_\s+(\d+)\s+"([\s\S]*?)"\s*;\s*$/;
+        var reCM_SG = /^\s*CM_\s+SG_\s+(\d+)\s+([A-Za-z_][\w]*)\s+"([\s\S]*?)"\s*;\s*$/;
+
         var reVT = /^\s*VAL_TABLE_\s+([A-Za-z_][\w]*)\s+(.*?)\s*;\s*$/;
         var reVAL = /^\s*VAL_\s+(\d+)\s+([A-Za-z_][\w]*)\s+(.*?)\s*;\s*$/;
 
@@ -125,48 +177,123 @@
 
             if ((m = reVER.exec(ln))) { projOut.version = m[1]; continue; }
             if ((m = reBU.exec(ln))) { var ns = (m[1] || '').trim().split(/\s+/); if (ns.length && ns[0]) projOut.nodes = ns; continue; }
-            if ((m = reBO.exec(ln))) { curMsg = new Message(); curMsg.canId = parseInt(m[1], 10); curMsg.name = m[2]; curMsg.dlc = parseInt(m[3], 10); curMsg.tx = m[4]; projOut.addMessage(curMsg); continue; }
+
+            if ((m = reBO.exec(ln))) {
+                curMsg = new Message();
+                curMsg.canId = parseInt(m[1], 10);
+                curMsg.name = m[2];
+                curMsg.dlc = parseInt(m[3], 10);
+                curMsg.tx = m[4];
+                projOut.addMessage(curMsg);
+                continue;
+            }
+
             if ((m = reSG.exec(ln))) {
                 if (!curMsg) continue;
                 var s = new Signal();
-                s.name = m[1]; s.start = parseInt(m[2], 10); s.len = parseInt(m[3], 10);
-                s.le = (m[4] === '1'); s.signed = (m[5] === '-');
-                s.factor = parseFloat(m[6]); s.offset = parseFloat(m[7]);
-                s.min = parseFloat(m[8]); s.max = parseFloat(m[9]);
+                s.name = m[1];
+                s.start = parseInt(m[2], 10);
+                s.len = parseInt(m[3], 10);
+                s.le = (m[4] === '1');
+                s.signed = (m[5] === '-');
+                s.factor = parseFloat(m[6]);
+                s.offset = parseFloat(m[7]);
+                s.min = parseFloat(m[8]);
+                s.max = parseFloat(m[9]);
                 s.unit = m[10];
-                s.receivers = m[11].split(',').map(function (x) { return x.trim(); }).filter(function (x) { return !!x; });
-                curMsg.signals.push(s); continue;
+                s.receivers = m[11]
+                    .split(',')
+                    .map(function (x) { return x.trim(); })
+                    .filter(function (x) { return !!x; });
+                curMsg.signals.push(s);
+                continue;
             }
+
             if ((m = reCM_BO.exec(ln))) {
-                id = parseInt(m[1], 10); msg = null;
-                for (j = 0; j < projOut.messages.length; j++) { if (projOut.messages[j].canId === id) { msg = projOut.messages[j]; break; } }
-                if (msg) msg.comment = m[2]; continue;
+                id = parseInt(m[1], 10);
+                msg = null;
+                for (j = 0; j < projOut.messages.length; j++) {
+                    if (projOut.messages[j].canId === id) { msg = projOut.messages[j]; break; }
+                }
+                if (msg) msg.comment = m[2];
+                continue;
             }
+
             if ((m = reCM_SG.exec(ln))) {
-                id = parseInt(m[1], 10); msg = null;
-                for (j = 0; j < projOut.messages.length; j++) { if (projOut.messages[j].canId === id) { msg = projOut.messages[j]; break; } }
+                id = parseInt(m[1], 10);
+                msg = null;
+                for (j = 0; j < projOut.messages.length; j++) {
+                    if (projOut.messages[j].canId === id) { msg = projOut.messages[j]; break; }
+                }
                 if (msg) {
-                    for (k = 0; k < msg.signals.length; k++) { if (msg.signals[k].name === m[2]) { msg.signals[k].comment = m[3]; break; } }
+                    for (k = 0; k < msg.signals.length; k++) {
+                        if (msg.signals[k].name === m[2]) { msg.signals[k].comment = m[3]; break; }
+                    }
                 }
                 continue;
             }
+
             if ((m = reVT.exec(ln))) {
-                items = []; reItem = /(-?\d+)\s+"([^"]*)"/g;
-                while ((mm = reItem.exec(m[2])) !== null) { items.push([parseInt(mm[1], 10), mm[2]]); }
-                projOut.valueTables[m[1]] = items; continue;
+                items = [];
+                reItem = /(-?\d+)\s+"([^"]*)"/g;
+                while ((mm = reItem.exec(m[2])) !== null) {
+                    items.push([parseInt(mm[1], 10), mm[2]]);
+                }
+                projOut.valueTables[m[1]] = items;
+                continue;
             }
+
             if ((m = reVAL.exec(ln))) {
-                id = parseInt(m[1], 10); sigName = m[2];
-                items = []; reItem = /(-?\d+)\s+"([^"]*)"/g;
-                while ((mm = reItem.exec(m[3])) !== null) { items.push([parseInt(mm[1], 10), mm[2]]); }
-                msg = null; for (j = 0; j < projOut.messages.length; j++) { if (projOut.messages[j].canId === id) { msg = projOut.messages[j]; break; } }
+                id = parseInt(m[1], 10);
+                sigName = m[2];
+                items = [];
+                reItem = /(-?\d+)\s+"([^"]*)"/g;
+                while ((mm = reItem.exec(m[3])) !== null) {
+                    items.push([parseInt(mm[1], 10), mm[2]]);
+                }
+                msg = null;
+                for (j = 0; j < projOut.messages.length; j++) {
+                    if (projOut.messages[j].canId === id) { msg = projOut.messages[j]; break; }
+                }
                 if (msg) {
                     var vtName = '__VAL__' + id + '__' + sigName;
                     projOut.valueTables[vtName] = items;
-                    for (k = 0; k < msg.signals.length; k++) { if (msg.signals[k].name === sigName) { msg.signals[k].valTable = vtName; break; } }
+                    for (k = 0; k < msg.signals.length; k++) {
+                        if (msg.signals[k].name === sigName) { msg.signals[k].valTable = vtName; break; }
+                    }
                 }
                 continue;
             }
+        }
+    }
+
+
+    /* ===== 值表辅助 ===== */
+    function getValTableNames() {
+        var names = [], k; for (k in proj.valueTables) { if (proj.valueTables.hasOwnProperty(k)) names.push(k); }
+        names.sort(); return names;
+    }
+    function buildVtSelect(currentName) {
+        var sel = document.createElement('select');
+        sel.className = 'form-select form-select-sm sig-vt';
+        var op0 = document.createElement('option'); op0.value = ''; op0.textContent = '(无)'; sel.appendChild(op0);
+        getValTableNames().forEach(function (n) {
+            var o = document.createElement('option'); o.value = n; o.textContent = n; sel.appendChild(o);
+        });
+        sel.value = currentName || '';
+        return sel;
+    }
+    function refreshAllSignalVtSelects() {
+        var names = getValTableNames();
+        var nodes = document.querySelectorAll('.sig-vt');
+        for (var i = 0; i < nodes.length; i++) {
+            var sel = nodes[i], cur = sel.value;
+            sel.innerHTML = '';
+            var op0 = document.createElement('option'); op0.value = ''; op0.textContent = '(无)'; sel.appendChild(op0);
+            for (var j = 0; j < names.length; j++) {
+                var n = names[j], o = document.createElement('option'); o.value = n; o.textContent = n; sel.appendChild(o);
+            }
+            sel.value = cur || '';
         }
     }
 
@@ -180,6 +307,7 @@
         btnNewMsg: document.getElementById('btnNewMsg'),
         btnNewSig: document.getElementById('btnNewSig'),
         btnDelMsg: document.getElementById('btnDelMsg'),
+        btnLayout: document.getElementById('btnLayout'),
         fileImport: document.getElementById('fileImport'),
         selImportEnc: document.getElementById('selImportEnc'),
         btnExport: document.getElementById('btnExport'),
@@ -236,35 +364,6 @@
         els.mComment.value = m.comment || '';
         renderSigGrid(m);
         refreshPreview();
-    }
-
-    /* ===== 值表工具 & 下拉 ===== */
-    function getValTableNames() {
-        var names = [], k; for (k in proj.valueTables) { if (proj.valueTables.hasOwnProperty(k)) names.push(k); }
-        names.sort(); return names;
-    }
-    function buildVtSelect(currentName) {
-        var sel = document.createElement('select');
-        sel.className = 'form-select form-select-sm sig-vt';
-        var op0 = document.createElement('option'); op0.value = ''; op0.textContent = '(无)'; sel.appendChild(op0);
-        getValTableNames().forEach(function (n) {
-            var o = document.createElement('option'); o.value = n; o.textContent = n; sel.appendChild(o);
-        });
-        sel.value = currentName || '';
-        return sel;
-    }
-    function refreshAllSignalVtSelects() {
-        var names = getValTableNames();
-        var nodes = document.querySelectorAll('.sig-vt');
-        for (var i = 0; i < nodes.length; i++) {
-            var sel = nodes[i], cur = sel.value;
-            sel.innerHTML = '';
-            var op0 = document.createElement('option'); op0.value = ''; op0.textContent = '(无)'; sel.appendChild(op0);
-            for (var j = 0; j < names.length; j++) {
-                var n = names[j], o = document.createElement('option'); o.value = n; o.textContent = n; sel.appendChild(o);
-            }
-            sel.value = cur || '';
-        }
     }
 
     function renderSigGrid(m) {
@@ -373,6 +472,15 @@
         m.signals.push(s); renderSigGrid(m); refreshPreview();
     });
 
+    // layout 按钮
+    if (els.btnLayout) {
+        els.btnLayout.addEventListener('click', function () {
+            var m = proj.messages[selectedMsgIndex];
+            if (!m) return;
+            openLayoutModal(m);
+        });
+    }
+
     ['mCanId', 'mName', 'mDlc', 'mTx', 'mExt', 'mComment', 'inpVersion'].forEach(function (id) {
         var el = els[id];
         el.addEventListener('input', function () {
@@ -408,69 +516,37 @@
     els.fileImport.addEventListener('change', function () {
         var f = els.fileImport.files && els.fileImport.files[0];
         if (!f) return;
-
         var mode = els.selImportEnc.value || 'auto';
-        var readAsText = function (file) {
-            return file.text ? file.text() : new Promise(function (res, rej) {
-                var r = new FileReader(); r.onload = function () { res(r.result) }; r.onerror = rej; r.readAsText(file);
-            });
-        };
-
+        var readAsText = function (file) { return file.text ? file.text() : new Promise(function (res, rej) { var r = new FileReader(); r.onload = function () { res(r.result) }; r.onerror = rej; r.readAsText(file); }); };
         (async function () {
             var text = '';
             try {
-                if (mode === 'utf8') {
-                    text = await readAsText(f);
-                } else if (mode === 'gbk') {
+                if (mode === 'utf8') { text = await readAsText(f); }
+                else if (mode === 'gbk') {
                     if (window.TextDecoder) {
-                        try {
-                            var buf = await f.arrayBuffer();
-                            var dec = new TextDecoder('gb18030');
-                            text = dec.decode(buf);
-                        } catch (e) {
-                            text = await readAsText(f);
-                        }
-                    } else {
-                        text = await readAsText(f);
-                    }
+                        try { var buf = await f.arrayBuffer(); var dec = new TextDecoder('gb18030'); text = dec.decode(buf); }
+                        catch (e) { text = await readAsText(f); }
+                    } else { text = await readAsText(f); }
                 } else {
                     if (window.TextDecoder) {
                         var buf = await f.arrayBuffer(); var u8 = new Uint8Array(buf);
-                        if (u8[0] === 0xEF && u8[1] === 0xBB && u8[2] === 0xBF) {
-                            text = new TextDecoder('utf-8').decode(u8.subarray(3));
-                        } else {
-                            try {
-                                text = new TextDecoder('utf-8', { fatal: true }).decode(u8);
-                            } catch (_) {
-                                try { text = new TextDecoder('gb18030').decode(u8); }
-                                catch (_e) { text = new TextDecoder().decode(u8); }
-                            }
+                        if (u8[0] === 0xEF && u8[1] === 0xBB && u8[2] === 0xBF) { text = new TextDecoder('utf-8').decode(u8.subarray(3)); }
+                        else {
+                            try { text = new TextDecoder('utf-8', { fatal: true }).decode(u8); }
+                            catch (_) { try { text = new TextDecoder('gb18030').decode(u8); } catch (_e) { text = new TextDecoder().decode(u8); } }
                         }
-                    } else {
-                        text = await readAsText(f);
-                    }
+                    } else { text = await readAsText(f); }
                 }
-            } catch (e) {
-                alert('读取失败: ' + (e.message || e));
-                return;
-            }
-
-            text = stripBOM(text);
-            parseDBCIntoProject(text, proj);
-
+            } catch (e) { alert('读取失败: ' + (e.message || e)); return; }
+            text = stripBOM(text); parseDBCIntoProject(text, proj);
             selectedMsgIndex = proj.messages.length ? 0 : -1;
-
-            renderNodes();
-            renderMsgList();
-            openMsg();           // 打开首条消息（如有）
-            renderVtList();      // ★ 修复点：导入后刷新左侧“值表”列表
-            refreshAllSignalVtSelects(); // 同步中间表格的值表下拉
+            renderNodes(); renderMsgList(); openMsg();
+            renderVtList();              // 导入后刷新“值表”侧栏
+            refreshAllSignalVtSelects(); // 同步中间下拉
             refreshPreview();
-
             els.fileImport.value = '';
         })();
     });
-
 
     /* ===== 自测（原断言 + 额外两条） ===== */
     (function selfTests() {
@@ -502,6 +578,119 @@
 
         if (window.console && console.log) console.log('%cSelf-tests passed', 'color:green;font-weight:bold');
     })();
+
+    /* ====== Layout 可视化 ====== */
+    function colorForIndex(i) {
+        var h = (i * 57) % 360, s = 65, l = 62; s /= 100; l /= 100;
+        var c = (1 - Math.abs(2 * l - 1)) * s, x = c * (1 - Math.abs(((h / 60) % 2) - 1)), m = l - c / 2, r = 0, g = 0, b = 0;
+        if (h < 60) { r = c; g = x; } else if (h < 120) { r = x; g = c; }
+        else if (h < 180) { g = c; b = x; } else if (h < 240) { g = x; b = c; }
+        else if (h < 300) { r = x; b = c; } else { r = c; b = x; }
+        r = Math.round((r + m) * 255); g = Math.round((g + m) * 255); b = Math.round((b + m) * 255);
+        return 'rgb(' + r + ',' + g + ',' + b + ')';
+    }
+    function expandBitsLE(start, len) {
+        var out = [], idx = start;
+        for (var k = 0; k < len; k++, idx++) {
+            var byte = Math.floor(idx / 8), bit = idx % 8;
+            out.push({ byte: byte, bit: bit });
+        }
+        return out;
+    }
+    function expandBitsBE(start, len) {
+        var out = [];
+        var byte = Math.floor(start / 8), bit = start % 8;
+        for (var k = 0; k < len; k++) {
+            out.push({ byte: byte, bit: bit });
+            bit--; if (bit < 0) { bit = 7; byte++; }
+        }
+        return out;
+    }
+    function groupByRow(bitList) {
+        var map = {}, i;
+        for (i = 0; i < bitList.length; i++) {
+            var b = bitList[i], col = 7 - b.bit;
+            if (!map[b.byte]) map[b.byte] = [];
+            map[b.byte].push(col);
+        }
+        var rows = [], byteStr;
+        Object.keys(map).sort(function (a, b) { return a - b; }).forEach(function (byteStr) {
+            var byte = parseInt(byteStr, 10);
+            var cols = map[byte].sort(function (a, b) { return a - b; });
+            var segs = [], curStart = cols[0], prev = cols[0];
+            for (i = 1; i < cols.length; i++) {
+                if (cols[i] === prev + 1) { prev = cols[i]; }
+                else { segs.push({ from: curStart, to: prev }); curStart = prev = cols[i]; }
+            }
+            segs.push({ from: curStart, to: prev });
+            rows.push({ byte: byte, segs: segs });
+        });
+        return rows;
+    }
+    function drawLayoutForMessage(msg) {
+        var dlc = Math.max(1, Math.min(64, msg.dlc || 8));
+        var cellW = 90, cellH = 60, headW = 80, headH = 40, cols = 8, rows = dlc;
+        var cvs = document.getElementById('layoutCanvas'); var ctx = cvs.getContext('2d');
+        cvs.width = headW + cols * cellW; cvs.height = headH + rows * cellH;
+        ctx.clearRect(0, 0, cvs.width, cvs.height);
+        ctx.font = '12px ui-sans-serif, system-ui, -apple-system, "Segoe UI", "PingFang SC", Arial';
+        ctx.textBaseline = 'middle'; ctx.textAlign = 'center';
+
+        // 列头
+        ctx.fillStyle = '#e9ecef'; ctx.fillRect(headW, 0, cols * cellW, headH);
+        ctx.strokeStyle = '#adb5bd'; ctx.strokeRect(headW, 0, cols * cellW, headH);
+        ctx.fillStyle = '#495057';
+        for (var c = 0; c < cols; c++) {
+            var x = headW + c * cellW + cellW / 2; ctx.fillText(String(7 - c), x, headH / 2);
+            ctx.beginPath(); ctx.moveTo(headW + c * cellW, 0); ctx.lineTo(headW + c * cellW, headH + rows * cellH); ctx.strokeStyle = '#dee2e6'; ctx.stroke();
+        }
+        // 行头
+        ctx.fillStyle = '#e9ecef'; ctx.fillRect(0, headH, headW, rows * cellH);
+        ctx.strokeStyle = '#adb5bd'; ctx.strokeRect(0, headH, headW, rows * cellH);
+        ctx.fillStyle = '#495057';
+        for (var r = 0; r < rows; r++) {
+            var y = headH + r * cellH + cellH / 2; ctx.fillText(String(r), headW / 2, y);
+            ctx.beginPath(); ctx.moveTo(0, headH + r * cellH); ctx.lineTo(headW + cols * cellW, headH + r * cellH); ctx.strokeStyle = '#dee2e6'; ctx.stroke();
+        }
+
+        // 信号
+        for (var i = 0; i < msg.signals.length; i++) {
+            var s = msg.signals[i];
+            var bits = s.le ? expandBitsLE(s.start | 0, s.len | 0) : expandBitsBE(s.start | 0, s.len | 0);
+            var grouped = groupByRow(bits);
+            var color = colorForIndex(i);
+
+            grouped.forEach(function (rowSeg) {
+                rowSeg.segs.forEach(function (seg) {
+                    var x = headW + seg.from * cellW, y = headH + rowSeg.byte * cellH, w = (seg.to - seg.from + 1) * cellW, h = cellH;
+                    ctx.fillStyle = color; ctx.globalAlpha = 0.75; ctx.fillRect(x, y, w, h); ctx.globalAlpha = 1;
+                    ctx.strokeStyle = '#666'; ctx.strokeRect(x + 0.5, y + 0.5, w - 1, h - 1);
+                    ctx.fillStyle = '#111'; ctx.fillText(s.name || ('Sig' + (i + 1)), x + w / 2, y + h / 2);
+                });
+            });
+
+            // msb / lsb 标注（首/末位）
+            var first = bits[0], last = bits[bits.length - 1];
+            var msbCol = 7 - first.bit, lsbCol = 7 - last.bit;
+            var msbX = headW + msbCol * cellW, msbY = headH + first.byte * cellH;
+            var lsbX = headW + lsbCol * cellW, lsbY = headH + last.byte * cellH;
+            ctx.fillStyle = '#d6336c';
+            // msb
+            ctx.beginPath(); ctx.moveTo(msbX + 6, msbY + 6); ctx.lineTo(msbX + 18, msbY + 6); ctx.lineTo(msbX + 12, msbY + 16); ctx.closePath(); ctx.fill();
+            ctx.fillText('msb', msbX + 24, msbY + 14);
+            // lsb
+            ctx.beginPath(); ctx.moveTo(lsbX + 6, lsbY + cellH - 6); ctx.lineTo(lsbX + 18, lsbY + cellH - 6); ctx.lineTo(lsbX + 12, lsbY + cellH - 16); ctx.closePath(); ctx.fill();
+            ctx.fillText('lsb', lsbX + 24, lsbY + cellH - 14);
+        }
+    }
+    function openLayoutModal(msg) {
+        if (!msg) return;
+        var meta = document.getElementById('layoutMeta');
+        meta.textContent = '消息：' + msg.name + '   CAN ID：' + msg.canId + '   DLC：' + msg.dlc + '   信号数：' + msg.signals.length;
+        var cvs = document.getElementById('layoutCanvas'); cvs.width = 1200; cvs.height = 700;
+        drawLayoutForMessage(msg);
+        var modal = new bootstrap.Modal(document.getElementById('layoutModal')); modal.show();
+    }
 
     /* ===== 初始化示例 & 紧凑模式 ===== */
     (function initDemo() {

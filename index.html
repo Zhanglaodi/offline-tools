@@ -1,0 +1,416 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Links Hub · 嵌入式风格</title>
+  <style>
+    :root {
+      --bg: #0a0f0a;
+      /* 深色主背景 */
+      --panel: #0f1710;
+      /* 面板 */
+      --card: #0b140d;
+      /* 卡片 */
+      --grid: #0e1a12;
+      /* 背景网格 */
+      --fg: #cde7cf;
+      /* 正文字体 */
+      --muted: #8aa08d;
+      /* 次要文字 */
+      --accent: #5ce65c;
+      /* 霓虹绿 */
+      --accent-2: #ffc857;
+      /* 琥珀黄 */
+      --danger: #ff6b6b;
+      /* 红色 */
+      --shadow: 0 10px 30px rgba(0, 0, 0, .35);
+      --radius: 16px;
+    }
+
+    html,
+    body {
+      height: 100%
+    }
+
+    body {
+      margin: 0;
+      font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace;
+      background: radial-gradient(1200px 1200px at 20% -10%, rgba(92, 230, 92, .18), transparent 40%),
+        linear-gradient(transparent 0, rgba(92, 230, 92, .04) 100%),
+        var(--bg);
+      color: var(--fg);
+      letter-spacing: .2px;
+    }
+
+    /* PCB 背景网格 */
+    .grid-bg {
+      position: fixed;
+      inset: 0;
+      z-index: -1;
+      background-image: linear-gradient(0deg, transparent 24%, var(--grid) 25%, var(--grid) 26%, transparent 27%, transparent 74%, var(--grid) 75%, var(--grid) 76%, transparent 77%),
+        linear-gradient(90deg, transparent 24%, var(--grid) 25%, var(--grid) 26%, transparent 27%, transparent 74%, var(--grid) 75%, var(--grid) 76%, transparent 77%);
+      background-size: 36px 36px;
+      mask-image: radial-gradient(1200px 1200px at 60% -10%, #000 30%, transparent 70%);
+      opacity: .6;
+    }
+
+    header {
+      position: sticky;
+      top: 0;
+      z-index: 5;
+      backdrop-filter: blur(6px);
+      background: linear-gradient(180deg, rgba(10, 15, 10, .9), rgba(10, 15, 10, .65));
+      border-bottom: 1px solid rgba(92, 230, 92, .18);
+    }
+
+    .wrap {
+      max-width: 1080px;
+      margin: 0 auto;
+      padding: 18px 18px;
+    }
+
+    .brand {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+    }
+
+    .chip {
+      width: 38px;
+      height: 38px;
+      border-radius: 6px;
+      background: linear-gradient(145deg, #0c190f, #0a120b);
+      border: 1px solid rgba(92, 230, 92, .35);
+      box-shadow: inset 0 0 0 2px rgba(92, 230, 92, .08), var(--shadow);
+      position: relative;
+    }
+
+    $1 pointer-events:none;
+
+    $2 .chip:after {
+      top: auto;
+      bottom: 8px;
+    }
+
+    .title {
+      font-size: 18px;
+      font-weight: 700;
+      letter-spacing: .8px
+    }
+
+    .toolbar {
+      display: grid;
+      grid-template-columns: 1fr auto auto auto;
+      gap: 12px;
+      margin-top: 14px
+    }
+
+    .search {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      background: var(--panel);
+      border: 1px solid rgba(92, 230, 92, .25);
+      border-radius: 12px;
+      padding: 10px 12px;
+      box-shadow: var(--shadow);
+    }
+
+    .search input {
+      flex: 1;
+      background: transparent;
+      border: none;
+      outline: none;
+      color: var(--fg);
+      font-size: 15px
+    }
+
+    .btn {
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      padding: 10px 14px;
+      background: var(--panel);
+      border: 1px solid rgba(92, 230, 92, .25);
+      color: var(--fg);
+      border-radius: 12px;
+      cursor: pointer;
+      user-select: none;
+      box-shadow: var(--shadow)
+    }
+
+    .btn:hover {
+      border-color: rgba(92, 230, 92, .55)
+    }
+
+    .btn.secondary {
+      border-color: rgba(255, 200, 87, .45)
+    }
+
+    .tags {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 8px;
+      margin-top: 12px
+    }
+
+    .tag {
+      padding: 6px 10px;
+      font-size: 12px;
+      border: 1px solid rgba(92, 230, 92, .25);
+      border-radius: 999px;
+      cursor: pointer;
+      color: var(--muted);
+      background: #0c140e
+    }
+
+    .tag.active {
+      color: #041;
+      background: var(--accent);
+      border-color: var(--accent)
+    }
+
+    .grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(260px, 1fr));
+      gap: 16px;
+      margin-top: 16px
+    }
+
+    .card {
+      background: linear-gradient(180deg, #0b140d, #071009);
+      border: 1px solid rgba(92, 230, 92, .25);
+      border-radius: var(--radius);
+      padding: 14px;
+      position: relative;
+      overflow: hidden;
+      box-shadow: 0 0 0 1px rgba(92, 230, 92, .06) inset, var(--shadow);
+    }
+
+    $1 pointer-events:none;
+
+    $2 .card h3 {
+      margin: 0;
+      font-size: 16px;
+      letter-spacing: .4px
+    }
+
+    .card p {
+      margin: 8px 0 10px;
+      font-size: 13px;
+      color: var(--muted);
+      line-height: 1.5
+    }
+
+    .row {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      flex-wrap: wrap
+    }
+
+    .badge {
+      font-size: 11px;
+      padding: 2px 8px;
+      border-radius: 999px;
+      border: 1px solid rgba(92, 230, 92, .35);
+      background: #0e1a12;
+      color: var(--accent-2)
+    }
+
+    .led {
+      width: 10px;
+      height: 10px;
+      border-radius: 50%;
+      background: #2a3a2c;
+      box-shadow: 0 0 10px rgba(0, 0, 0, .6) inset, 0 0 0 1px rgba(92, 230, 92, .25)
+    }
+
+    .led.on {
+      background: radial-gradient(circle at 40% 40%, #dfffdf 0, #7dfb7d 30%, #22b322 60%, #0c4f0c 100%);
+      box-shadow: 0 0 12px rgba(92, 230, 92, .75)
+    }
+
+    .led.off {
+      background: radial-gradient(circle at 40% 40%, #ffd9d9 0, #ff7d7d 30%, #b32222 60%, #4f0c0c 100%);
+      box-shadow: 0 0 12px rgba(255, 107, 107, .55)
+    }
+
+    .card .actions {
+      display: flex;
+      gap: 8px;
+      margin-top: 10px
+    }
+
+    .link {
+      flex: 1
+    }
+
+    .btn.sm {
+      padding: 8px 10px;
+      border-radius: 10px;
+      font-size: 12px
+    }
+
+    .muted {
+      color: var(--muted)
+    }
+
+    .right {
+      margin-left: auto
+    }
+
+    .footer {
+      opacity: .7;
+      font-size: 12px;
+      padding: 24px 0;
+      text-align: center;
+      color: var(--muted)
+    }
+
+    .modal-mask {
+      position: fixed;
+      inset: 0;
+      background: rgba(0, 0, 0, .45);
+      display: none;
+      align-items: center;
+      justify-content: center;
+      z-index: 20
+    }
+
+    .modal {
+      background: var(--panel);
+      border: 1px solid rgba(92, 230, 92, .35);
+      border-radius: 16px;
+      width: min(560px, 92vw);
+      box-shadow: var(--shadow)
+    }
+
+    .modal h4 {
+      margin: 0;
+      padding: 14px 16px;
+      border-bottom: 1px solid rgba(92, 230, 92, .18)
+    }
+
+    .modal .body {
+      padding: 16px;
+      display: grid;
+      gap: 12px
+    }
+
+    .modal label {
+      font-size: 13px;
+      color: var(--muted)
+    }
+
+    .modal input,
+    .modal textarea {
+      width: 100%;
+      background: #0a120b;
+      color: var(--fg);
+      border: 1px solid rgba(92, 230, 92, .25);
+      border-radius: 10px;
+      padding: 10px;
+      font-family: inherit
+    }
+
+    .modal .row {
+      justify-content: flex-end
+    }
+
+    .fav {
+      cursor: pointer;
+      margin-left: auto;
+      opacity: .7
+    }
+
+    .fav.active {
+      color: var(--accent-2);
+      opacity: 1
+    }
+
+    .scanline {
+      position: fixed;
+      inset: 0;
+      pointer-events: none;
+      background: repeating-linear-gradient(to bottom, rgba(255, 255, 255, .02), rgba(255, 255, 255, .02) 1px, transparent 1px, transparent 3px);
+      mix-blend-mode: overlay;
+      opacity: .35
+    }
+
+    @media (max-width:640px) {
+      .toolbar {
+        grid-template-columns: 1fr;
+      }
+    }
+  </style>
+</head>
+
+<body>
+  <div class="grid-bg"></div>
+  <div class="scanline"></div>
+  <header>
+    <div class="wrap">
+      <div class="brand">
+        <div class="chip" aria-hidden="true"></div>
+        <div>
+          <div class="title">Links Hub · 嵌入式工具面板</div>
+          <div class="muted" style="font-size:12px">管理你的所有小工具与网页链接 · 支持搜索 / 标签 / 收藏 / 本地保存</div>
+        </div>
+      </div>
+      <div class="toolbar">
+        <div class="search">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
+            stroke-linecap="round" stroke-linejoin="round">
+            <circle cx="11" cy="11" r="8" />
+            <path d="m21 21-4.3-4.3" />
+          </svg>
+          <input id="q" type="text" placeholder="搜索名称、说明或标签…（按 / 快速聚焦）" />
+          <span class="muted" id="count"></span>
+        </div>
+        <button class="btn" id="btn-add">➕ 添加链接</button>
+        <button class="btn" id="btn-export">⬇️ 导出JSON</button>
+        <button class="btn secondary" id="btn-import">⬆️ 导入JSON</button>
+      </div>
+      <div class="tags" id="tags"></div>
+    </div>
+  </header>
+
+  <main class="wrap">
+    <section class="grid" id="list"></section>
+    <div class="footer">© 2025 Links Hub • 纯静态页面 · 可本地文件直接打开 · 数据保存在浏览器本地（localStorage）。</div>
+  </main>
+
+  <!-- 添加/编辑 模态 -->
+  <div class="modal-mask" id="mask">
+    <div class="modal">
+      <h4 id="modal-title">添加链接</h4>
+      <div class="body">
+        <div>
+          <label>名称</label>
+          <input id="f-title" placeholder="例如：DBC 注释修复小工具" />
+        </div>
+        <div>
+          <label>URL（http/https 或本地文件路径）</label>
+          <input id="f-url" placeholder="https://example.com/tool" />
+        </div>
+        <div>
+          <label>说明</label>
+          <textarea id="f-desc" rows="3" placeholder="一句话描述用途"></textarea>
+        </div>
+        <div>
+          <label>标签（用逗号分隔）</label>
+          <input id="f-tags" placeholder="CAN, DBC, STM32" />
+        </div>
+        <div class="row">
+          <button class="btn" id="btn-cancel">取消</button>
+          <button class="btn" id="btn-save">保存</button>
+        </div>
+      </div>
+    </div>
+  </div>
+</body>
+</html>
+<script src="./js/app.js"></script>
