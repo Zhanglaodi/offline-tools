@@ -1,7 +1,24 @@
-# offline-tools
+# 🌐 离线工具
 
-Some simple and practical development widgets. Baud rate calculation, simple DBC file creation and modification, website navigation...  
+> 一个简洁的静态页面应用，主要用于 [这里写用途，比如：展示个人主页 / 工具页 / 小型应用]。
 
-## Mini-DBC Tools
+---
 
-## baud_rate
+## 📸 效果预览
+
+![screenshot](docs/screenshot.png)
+
+或者用链接直接打开：  
+👉 [点击预览](https://yourdomain.com)
+
+---
+
+## 🚀 使用方法
+
+1. 下载项目文件并解压。  
+2. 双击 `index.html` 即可在浏览器中打开。  
+3. 如果需要部署到服务器，将整个文件夹上传即可。  
+
+---
+
+## 📂 文件结构

@@ -4,11 +4,12 @@ const STORAGE_KEY = 'links-hub-v1';
 
 /** @type {Array < { id: string, title: string, url: string, desc: string, tags: string[], kind: 'WEB' | 'LOCAL', online?: boolean, fav?: boolean } >} */
 const DEFAULT_LINKS = [
-    { id: crypto.randomUUID(), title: 'DBC 注释修复工具', url: './dbc_editor/index.html', desc: '本地页面：修复跨行注释的 DBC 可视化。', tags: ['CAN', 'DBC', '前端'], kind: 'LOCAL', online: true },
-    { id: crypto.randomUUID(), title: '进制转换工具', url: './base_converter/index.html', desc: '进制之间互转', tags: ['进制', '工具'], kind: 'LOCAL', online: true },
-    { id: crypto.randomUUID(), title: '波特率计算工具', url: './baud_rate/index.html', desc: '波特率计算', tags: ['波特率', '调试'], kind: 'LOCAL', online: true },
+    { id: crypto.randomUUID(), title: 'DBC 编写工具', url: './tools/dbc_editor/index.html', desc: '本地页面：修复跨行注释的 DBC 可视化。', tags: ['CAN', 'DBC', '前端'], kind: 'LOCAL', online: true },
+    { id: crypto.randomUUID(), title: '进制转换工具', url: './tools/base_converter/index.html', desc: '进制之间互转', tags: ['进制', '工具'], kind: 'LOCAL', online: true },
+    { id: crypto.randomUUID(), title: '波特率计算工具', url: './tools/baud_rate/index.html', desc: '波特率计算', tags: ['波特率', '调试'], kind: 'LOCAL', online: true },
+    { id: crypto.randomUUID(), title: '创芯曲线工具', url: './tools/创芯科技/index.html', desc: '创新科技曲线工具,只支持csv文件', tags: ['曲线', '创芯', '工具'], kind: 'LOCAL', online: true },
+    { id: crypto.randomUUID(), title: '周立功曲线工具', url: './tools/周立功/index.html', desc: '支持解析ASC文件', tags: ['曲线', '周立功', '工具'], kind: 'LOCAL', online: true },
     { id: crypto.randomUUID(), title: 'STM32 文档 (F4 HAL)', url: 'https://www.st.com/en/embedded-software/stm32cube-mcu-packages.html', desc: 'F4 HAL 参考与例程入口。', tags: ['STM32', 'HAL', '文档'], kind: 'WEB', online: true }
-
 ];
 
 let state = {
