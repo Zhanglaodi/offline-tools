@@ -9,6 +9,7 @@ const DEFAULT_LINKS = [
     { id: crypto.randomUUID(), title: '波特率计算工具', url: './tools/baud_rate/index.html', desc: '波特率计算', tags: ['波特率', '调试'], kind: 'LOCAL', online: true },
     { id: crypto.randomUUID(), title: '创芯曲线工具', url: './tools/创芯科技/index.html', desc: '创新科技曲线工具,只支持csv文件', tags: ['曲线', '创芯', '工具'], kind: 'LOCAL', online: true },
     { id: crypto.randomUUID(), title: '周立功曲线工具', url: './tools/周立功/index.html', desc: '支持解析ASC文件', tags: ['曲线', '周立功', '工具'], kind: 'LOCAL', online: true },
+    { id: crypto.randomUUID(), title: '串口工具-网页', url: './tools/serial/index.html', desc: '串口工具-仅供娱乐', tags: ['串口', '工具'], kind: 'LOCAL', online: true },
     { id: crypto.randomUUID(), title: 'STM32 文档 (F4 HAL)', url: 'https://www.st.com/en/embedded-software/stm32cube-mcu-packages.html', desc: 'F4 HAL 参考与例程入口。', tags: ['STM32', 'HAL', '文档'], kind: 'WEB', online: true }
 ];
 
@@ -94,7 +95,26 @@ function renderList() {
     });
 }
 
-function render() { renderTags(); renderList(); }
+function render() {
+    renderTags(); renderList();
+    // 放在 <script> 最后或 DOMContentLoaded 后执行
+    (function showConsoleEasterEgg() {
+        if (window.__ce_done__) return;  // 防重复
+        window.__ce_done__ = true;
+
+        // 用 collapsed 分组，避免占空间
+        console.groupCollapsed('%c✨ Hi, Hacker! 欢迎探索~',
+            'background:#111;color:#9ae6b4;padding:6px 10px;border-radius:6px;font-size:14px');
+        console.log('%c项目: Web Serial 工具', 'color:#a0aec0');
+        console.log('%c提示: 输入 help() 获取隐藏指令', 'color:#63b3ed');
+        console.groupEnd();
+
+        // 简单命令
+        window.help = () => console.log('%c命令: pro(), about()', 'color:#f6ad55');
+        window.pro = () => console.log('%c专业模式未开放，敬请期待~', 'color:#ed64a6');
+        window.about = () => console.log('%cAuthor: xt  |  Build: ' + new Date().toLocaleString(), 'color:#cbd5e0');
+    })();
+}
 
 // —— 交互 ——
 const q = $('#q');

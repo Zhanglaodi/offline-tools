@@ -1,0 +1,478 @@
+<!DOCTYPE html>
+<html lang="zh">
+
+<head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width,initial-scale=1" />
+    <title>网页串口工具 (Web Serial)</title>
+    <style>
+        :root {
+            --bg: #0f1117;
+            --fg: #e6edf3;
+            --muted: #8b949e;
+            --accent: #2f81f7;
+            --ok: #2ea043;
+            --warn: #d29922;
+            --err: #f85149;
+        }
+
+        * {
+            box-sizing: border-box;
+        }
+
+        body {
+            margin: 12px;
+            font: 14px/1.4 ui-monospace, SFMono-Regular, Menlo, Consolas, "Liberation Mono", monospace;
+            background: var(--bg);
+            color: var(--fg);
+        }
+
+        h3 {
+            margin: 4px 0 12px;
+        }
+
+        fieldset {
+            border: 1px solid #30363d;
+            border-radius: 10px;
+            padding: 10px 12px;
+            margin: 0 0 10px;
+        }
+
+        legend {
+            color: var(--muted);
+            padding: 0 6px;
+        }
+
+        label {
+            margin-right: 8px;
+        }
+
+        select,
+        input[type="number"],
+        input[type="text"] {
+            background: #161b22;
+            border: 1px solid #30363d;
+            color: var(--fg);
+            border-radius: 8px;
+            padding: 6px 8px;
+        }
+
+        button {
+            background: #21262d;
+            color: var(--fg);
+            border: 1px solid #30363d;
+            border-radius: 10px;
+            padding: 6px 10px;
+            cursor: pointer;
+        }
+
+        button:hover {
+            border-color: #6e7681;
+        }
+
+        button.primary {
+            background: var(--accent);
+            border-color: var(--accent);
+        }
+
+        button.on {
+            background: var(--ok);
+            border-color: var(--ok);
+        }
+
+        .row {
+            display: flex;
+            gap: 8px;
+            flex-wrap: wrap;
+            align-items: center;
+        }
+
+        .grow {
+            flex: 1 1 auto;
+        }
+
+        #rx {
+            width: 100%;
+            height: 340px;
+            background: #0b0e14;
+            border: 1px solid #30363d;
+            border-radius: 10px;
+            padding: 8px;
+            overflow: auto;
+            white-space: pre-wrap;
+            word-break: break-all;
+        }
+
+        #tx {
+            width: 100%;
+            height: 90px;
+            background: #0b0e14;
+            border: 1px solid #30363d;
+            border-radius: 10px;
+            padding: 8px;
+            white-space: pre;
+        }
+
+        .badge {
+            display: inline-block;
+            padding: 2px 8px;
+            border-radius: 999px;
+            background: #161b22;
+            border: 1px solid #30363d;
+            color: var(--muted);
+        }
+
+        .badge.ok {
+            color: var(--ok);
+            border-color: var(--ok);
+        }
+
+        .badge.warn {
+            color: var(--warn);
+            border-color: var(--warn);
+        }
+
+        .badge.err {
+            color: var(--err);
+            border-color: var(--err);
+        }
+
+        .switch {
+            display: flex;
+            gap: 6px;
+            align-items: center;
+        }
+
+        .foot {
+            color: var(--muted);
+            font-size: 12px;
+            margin-top: 6px;
+        }
+    </style>
+</head>
+
+<body>
+    <h3>网页串口工具 (Web Serial)</h3>
+
+    <fieldset>
+        <legend>连接与串口参数</legend>
+        <div class="row">
+            <label>波特率
+                <input id="baud" type="number" min="50" value="115200" step="50" style="width:110px;">
+            </label>
+            <label>数据位
+                <select id="dataBits">
+                    <option>8</option>
+                    <option>7</option>
+                </select>
+            </label>
+            <label>停止位
+                <select id="stopBits">
+                    <option value="1">1</option>
+                    <option value="2">2</option>
+                </select>
+            </label>
+            <label>奇偶校验
+                <select id="parity">
+                    <option value="none">none</option>
+                    <option value="even">even</option>
+                    <option value="odd">odd</option>
+                </select>
+            </label>
+            <label>流控
+                <select id="flow">
+                    <option value="none">none</option>
+                    <option value="hardware">hardware (RTS/CTS)</option>
+                </select>
+            </label>
+            <button id="btnConnect" class="primary">连接</button>
+            <button id="btnDisconnect">断开</button>
+            <span id="portStat" class="badge">未连接</span>
+        </div>
+        <div class="row">
+            <div class="switch">
+                <button id="btnDTR">DTR</button>
+                <button id="btnRTS">RTS</button>
+                <span id="sigCTS" class="badge">CTS: ?</span>
+                <span id="sigDCD" class="badge">DCD: ?</span>
+                <span id="sigRI" class="badge">RI: ?</span>
+            </div>
+        </div>
+    </fieldset>
+
+    <fieldset>
+        <legend>接收区</legend>
+        <div class="row">
+            <label><input type="checkbox" id="ts" checked> 显示时间戳</label>
+            <label><input type="checkbox" id="hexRx"> 以 Hex 显示</label>
+            <label><input type="checkbox" id="autoscroll" checked> 自动滚动</label>
+            <button id="btnClear">清空</button>
+            <button id="btnSave">保存日志</button>
+        </div>
+        <div id="rx"></div>
+    </fieldset>
+
+    <fieldset>
+        <legend>发送区</legend>
+        <div class="row">
+            <label><input type="checkbox" id="hexTx"> Hex 发送</label>
+            <label>行结尾
+                <select id="eol">
+                    <option value="none">无</option>
+                    <option value="cr">CR \\r</option>
+                    <option value="lf">LF \\n</option>
+                    <option value="crlf" selected>CRLF \\r\\n</option>
+                </select>
+            </label>
+            <label>周期发送
+                <input id="interval" type="number" min="0" value="0" style="width:80px;"> ms (0 关闭)
+            </label>
+            <button id="btnSend">发送</button>
+            <button id="btnStopAuto">停止周期</button>
+        </div>
+        <textarea id="tx" placeholder="在此输入要发送的内容。勾选 Hex 发送时，支持 '01 02 0A FF' 或 '01020AFF' 格式。"></textarea>
+    </fieldset>
+
+    <div class="foot">提示：此工具需 Chrome/Edge (支持 Web Serial)。可设置 DTR/RTS、读取 CTS/DCD/RI 状态；流控选择 hardware 时启用 RTS/CTS。</div>
+
+    <script>
+
+        /* ======= Web Serial 全量逻辑 ======= */
+        let port, reader, writer;
+        let keepReading = false;
+        let dtr = false, rts = false;
+        let dec = new TextDecoder();        // 流式解码
+        let enc = new TextEncoder();
+        let rxBinaryBuf = new Uint8Array(0); // HEX 模式拼包
+        let rxLineBuf = "";                // ASCII 模式按行
+        let flushTimer = null;               // 粘合/兜底刷新的计时器
+        let saveBuf = [];                    // 保存日志
+        let sigPollTimer = null;             // 信号轮询计时器
+        let autoTimer = null;                // 周期发送计时器
+
+        /* --------- 便捷选择器 / DOM --------- */
+        const $ = s => document.querySelector(s);
+        const rxBox = $("#rx");
+
+        /* --------- 工具函数 --------- */
+        function rxPrint(msg, cls) {
+            const tsOn = $("#ts").checked;
+            const t = new Date();
+            const hh = String(t.getHours()).padStart(2, "0");
+            const mm = String(t.getMinutes()).padStart(2, "0");
+            const ss = String(t.getSeconds()).padStart(2, "0");
+            const ms = String(t.getMilliseconds()).padStart(3, "0");
+            const line = (tsOn ? `[${hh}:${mm}:${ss}.${ms}] ` : "") + msg;
+            const div = document.createElement("div");
+            if (cls) div.className = cls;
+            div.textContent = line;
+            rxBox.appendChild(div);
+            if ($("#autoscroll").checked) rxBox.scrollTop = rxBox.scrollHeight;
+            saveBuf.push(line);
+            if (saveBuf.length > 50000) saveBuf.shift();
+        }
+        function toHex(u8) { return Array.from(u8, b => b.toString(16).padStart(2, '0')).join(' '); }
+        function fromHex(str) {
+            const clean = str.replace(/[^0-9a-fA-F]/g, '');
+            if (clean.length % 2) throw new Error("Hex 长度需为偶数");
+            const out = new Uint8Array(clean.length / 2);
+            for (let i = 0; i < clean.length; i += 2) out[i / 2] = parseInt(clean.slice(i, i + 2), 16);
+            return out;
+        }
+        function concatU8(a, b) {
+            const out = new Uint8Array(a.length + b.length);
+            out.set(a, 0); out.set(b, a.length);
+            return out;
+        }
+        function badge(el, text, cls) {
+            el.textContent = text;
+            el.className = "badge " + (cls || "");
+        }
+
+        /* --------- 浏览器能力检测 --------- */
+        (function supportCheck() {
+            if (!("serial" in navigator)) {
+                rxPrint("❌ 当前浏览器不支持 Web Serial API，请使用 Chrome/Edge。", "err");
+            }
+        })();
+
+        /* --------- 串口连接/断开 --------- */
+        async function connect() {
+            try {
+                port = await navigator.serial.requestPort();
+                const opt = {
+                    baudRate: Number($("#baud").value) || 115200,
+                    dataBits: Number($("#dataBits").value) || 8,
+                    stopBits: Number($("#stopBits").value) || 1,
+                    parity: $("#parity").value,            // 'none' | 'even' | 'odd'
+                    flowControl: $("#flow").value          // 'none' | 'hardware'
+                };
+                await port.open(opt);
+                writer = port.writable.getWriter();
+                keepReading = true;
+
+                $("#portStat").textContent = "已连接";
+                $("#portStat").className = "badge ok";
+                rxPrint(`✅ 已连接，参数: ${opt.baudRate}/${opt.dataBits}/${opt.parity}/${opt.stopBits} flow=${opt.flowControl}`, "ok");
+
+                // 初始化 DTR/RTS
+                await port.setSignals({ dataTerminalReady: dtr, requestToSend: rts });
+
+                // 轮询硬件信号（部分平台可能不支持 getSignals）
+                if (sigPollTimer) clearInterval(sigPollTimer);
+                sigPollTimer = setInterval(updateSignalsBadge, 500);
+
+                readLoop();
+            } catch (e) {
+                rxPrint("连接失败: " + e.message, "err");
+            }
+        }
+
+        async function disconnect() {
+            try {
+                keepReading = false;
+                if (flushTimer) { clearTimeout(flushTimer); flushTimer = null; }
+                if (sigPollTimer) { clearInterval(sigPollTimer); sigPollTimer = null; }
+                if (autoTimer) { clearInterval(autoTimer); autoTimer = null; }
+
+                if (reader) { try { await reader.cancel(); } catch { } try { reader.releaseLock(); } catch { } reader = null; }
+                if (writer) { try { writer.releaseLock(); } catch { } writer = null; }
+                if (port) { try { await port.close(); } catch { } port = null; }
+
+                $("#portStat").textContent = "未连接";
+                $("#portStat").className = "badge";
+                rxPrint("🔌 已断开");
+            } catch (e) {
+                rxPrint("断开失败: " + e.message, "err");
+            }
+        }
+
+        /* --------- 读循环（拆包/按行/粘合） --------- */
+        async function readLoop() {
+            while (port && port.readable && keepReading) {
+                reader = port.readable.getReader();
+                try {
+                    while (true) {
+                        const { value, done } = await reader.read();
+                        if (done) break;
+                        if (!value || value.length === 0) continue;
+
+                        if ($("#hexRx").checked) {
+                            // HEX 显示：合并片段，定时刷出（避免一行被切断）
+                            rxBinaryBuf = concatU8(rxBinaryBuf, value);
+                            if (flushTimer) clearTimeout(flushTimer);
+                            flushTimer = setTimeout(() => {
+                                if (rxBinaryBuf.length) {
+                                    rxPrint("⬅ " + toHex(rxBinaryBuf));
+                                    rxBinaryBuf = new Uint8Array(0);
+                                }
+                            }, 5); // 5~10ms 经验值
+                        } else {
+                            // ASCII：流式解码 + 以换行切分
+                            rxLineBuf += dec.decode(value, { stream: true });
+                            rxLineBuf = rxLineBuf.replace(/\r\n/g, '\n').replace(/\r/g, '\n');
+
+                            let idx;
+                            while ((idx = rxLineBuf.indexOf('\n')) >= 0) {
+                                const line = rxLineBuf.slice(0, idx);
+                                rxLineBuf = rxLineBuf.slice(idx + 1);
+                                rxPrint("⬅ " + line);
+                            }
+                            // 兜底：若迟迟无换行，10ms 后也刷一次，避免半行悬挂
+                            if (flushTimer) clearTimeout(flushTimer);
+                            flushTimer = setTimeout(() => {
+                                if (rxLineBuf.length) {
+                                    rxPrint("⬅ " + rxLineBuf);
+                                    rxLineBuf = "";
+                                }
+                            }, 10);
+                        }
+                    }
+                } catch (e) {
+                    rxPrint("读取错误: " + e.message, "warn");
+                } finally {
+                    try { reader.releaseLock(); } catch { }
+                }
+            }
+        }
+
+        /* --------- 发送 --------- */
+        async function sendOnce() {
+            if (!writer) { rxPrint("未连接串口", "warn"); return; }
+            try {
+                let payload;
+                if ($("#hexTx").checked) {
+                    payload = fromHex($("#tx").value);
+                } else {
+                    let s = $("#tx").value;
+                    const eol = $("#eol").value;
+                    if (eol === "cr") s += "\r";
+                    else if (eol === "lf") s += "\n";
+                    else if (eol === "crlf") s += "\r\n";
+                    payload = enc.encode(s);
+                }
+                await writer.write(payload);
+                rxPrint("➡ 已发送 " + ($("#hexTx").checked ? (payload.length + "B HEX") : (payload.length + "B ASCII")));
+            } catch (e) {
+                rxPrint("发送失败: " + e.message, "err");
+            }
+        }
+
+        /* --------- 保存日志 --------- */
+        function saveLog() {
+            const blob = new Blob([saveBuf.join("\n")], { type: "text/plain;charset=utf-8" });
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url; a.download = `serial_log_${Date.now()}.txt`;
+            document.body.appendChild(a); a.click(); a.remove();
+            URL.revokeObjectURL(url);
+        }
+
+        /* --------- 硬件信号 --------- */
+        async function updateSignalsBadge() {
+            if (!port) return;
+            try {
+                const sig = await port.getSignals(); // {clearToSend, dataCarrierDetect, ringIndicator}
+                badge($("#sigCTS"), "CTS: " + (sig.clearToSend ? "1" : "0"), sig.clearToSend ? "ok" : "");
+                badge($("#sigDCD"), "DCD: " + (sig.dataCarrierDetect ? "1" : "0"), sig.dataCarrierDetect ? "ok" : "");
+                badge($("#sigRI"), "RI: " + (sig.ringIndicator ? "1" : "0"), sig.ringIndicator ? "ok" : "");
+            } catch (e) {
+                // 某些平台可能不支持，忽略即可
+            }
+        }
+
+        /* --------- 事件绑定 --------- */
+        $("#btnConnect").onclick = connect;
+        $("#btnDisconnect").onclick = disconnect;
+        $("#btnClear").onclick = () => { rxBox.textContent = ""; saveBuf.length = 0; };
+        $("#btnSave").onclick = saveLog;
+        $("#btnSend").onclick = sendOnce;
+        $("#btnStopAuto").onclick = () => { if (autoTimer) { clearInterval(autoTimer); autoTimer = null; rxPrint("⏹ 停止周期发送"); } };
+        $("#interval").addEventListener("change", () => {
+            const iv = Number($("#interval").value) || 0;
+            if (autoTimer) { clearInterval(autoTimer); autoTimer = null; }
+            if (iv > 0) {
+                autoTimer = setInterval(() => { sendOnce(); }, iv);
+                rxPrint("⏱ 启动周期发送: " + iv + " ms");
+            }
+        });
+        $("#btnDTR").onclick = async () => {
+            dtr = !dtr;
+            try { if (port) await port.setSignals({ dataTerminalReady: dtr }); } catch { }
+            $("#btnDTR").classList.toggle("on", dtr);
+        };
+        $("#btnRTS").onclick = async () => {
+            rts = !rts;
+            try { if (port) await port.setSignals({ requestToSend: rts }); } catch { }
+            $("#btnRTS").classList.toggle("on", rts);
+        };
+
+        /* --------- 快捷键 --------- */
+        // Ctrl/⌘ + Enter 发送
+        document.addEventListener("keydown", (e) => {
+            if (e.key === "Enter" && (e.ctrlKey || e.metaKey)) { sendOnce(); }
+        });
+    </script>
+</body>
+
+</html>
