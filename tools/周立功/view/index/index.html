@@ -1,0 +1,614 @@
+<!-- Bootstrap 的 CSS 文件 -->
+<link href="../../lib/bootstrap/bootstrap.min.css" rel="stylesheet">
+<style>
+    .row {
+        width: 100%;
+    }
+</style>
+
+<div class="row">
+    <div class="col-lg-3 col-md-3 col-sm-12">
+        <!-- 菜单 -->
+        <div class="input-group mb-3">
+            <span class="input-group-text">曲线名称</span>
+            <input type="text" class="form-control" id="curve_name" value="">
+        </div>
+        <div class="input-group mb-3">
+            <span class="input-group-text">CAN ID</span>
+            <div id="can_id" class="form-control"></div>
+        </div>
+        <div class="input-group mb-3">
+            <span class="input-group-text">开 始 位</span>
+            <input type="number" class="form-control" id="start" value="">
+        </div>
+        <div class="input-group mb-3">
+            <span class="input-group-text">长&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;度</span>
+            <input type="number" class="form-control" id="len" value="">
+        </div>
+        <div class="input-group mb-3">
+            <span class="input-group-text">精&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;度</span>
+            <input type="number" class="form-control" id="accuracy" value="">
+        </div>
+        <div class="input-group mb-3">
+            <span class="input-group-text">偏 移 量</span>
+            <input type="number" class="form-control" id="offset" value="">
+        </div>
+        <div class="input-group mb-3">
+            <span class="input-group-text">协议类型</span>
+            <select class="form-select" id="interest">
+                <option value="intel" selected="">intel</option>
+                <option value="motorola">motorola</option>
+                <option value="五菱">五菱</option>
+            </select>
+        </div>
+        <div class="input-group mb-3">
+            <span class="input-group-text">数据类型</span>
+            <select class="form-select" id="data_type">
+                <option value="unsigned" selected="">unsigned</option>
+                <option value="signed">signed</option>
+            </select>
+        </div>
+        <!-- 新增：周期(ms) 与 容差(0~1) —— 沿用你的 input-group 样式 -->
+        <div class="input-group mb-3">
+            <span class="input-group-text">周期(ms)</span>
+            <input type="number" class="form-control" id="cfg_period_ms" placeholder="如 10">
+        </div>
+        <div class="input-group mb-3">
+            <span class="input-group-text">容差(0~1)</span>
+            <input type="number" class="form-control" id="cfg_tol" placeholder="如 0.15">
+        </div>
+        <div class="form-check">
+            <input class="form-check-input" type="checkbox" value="" id="curves" checked>
+            <label class="form-check-label" for="curves">
+                多曲线模式
+            </label>
+        </div>
+        <div class="d-grid gap-2">
+            <button class="btn btn-primary" type="button" onclick="submit()">提交</button>
+            <button class="btn btn-outline-success" type="button" onclick="data_export()">数据导出</button>
+            <button class="btn btn-secondary" type="button" id="toggle_mode_btn"
+                onclick="toggle_mode()">切换样式：上下子图</button>
+        </div>
+    </div>
+    <div class="col-lg-9 col-md-9 col-sm-12">
+        <!-- 曲线 -->
+        <div id="curve" style="height: 600px"></div>
+    </div>
+</div>
+<!--</div>-->
+
+
+<!-- 引入 JQuery -->
+<script src="../../lib/jquery/jquery.min.js"></script>
+<!-- 引入 Layer -->
+<script src="../../lib/layer/layer.js"></script>
+<!-- 引入 Echarts.js -->
+<script src="../../lib/echarts-5.3.3/echarts.min.js"></script>
+<!-- 引入公共方法 -->
+<script src="../../js/common.js"></script>
+<!-- 引入 xm-select  -->
+<script src="../../lib/xm-select/xm-select.js"></script>
+
+<script>
+    // 全部数据内容
+    let parent_context = [];
+    // 所有的can_id
+    let can_id = [];
+    // 选中的can_id
+    let select_can_id = '';
+    // 导出数据
+    let export_data = {};
+    // 所有曲线数据
+    let curve_data = { legend: [], series: [] };
+    // eCharts 曲线实例
+    let myChart = echarts.init($('#curve')[0], null, {
+        renderer: 'canvas',
+        useDirtyRect: false
+    })
+    // 注册 曲线实例自适应事件
+    window.addEventListener('resize', myChart.resize);
+    // 注册消息事件监听，接受父元素给的数据
+    window.addEventListener('message', (e) => {
+        parent_context = e.data['file_context'];
+        can_id = e.data['can_id'];
+        xmSelect.render({
+            el: '#can_id',
+            model: {
+                label: { type: 'text' }
+            },
+            filterable: true,
+            radio: true,
+            clickClose: true,
+            data: can_id.map((v) => {
+                return {
+                    "name": v,
+                    "value": v
+                };
+            }),
+            on: function (data) {
+                if (data.isAdd) {
+                    select_can_id = data.arr[0]['value'];
+                } else {
+                    select_can_id = "";
+                }
+            }
+        });
+    }, false);
+
+    // 提交
+    function submit() {
+        // 收集数据（保持你的字段不变）
+        let requests_data = {
+            curve_name: $('#curve_name').val(),
+            can_id: select_can_id,
+            start: $('#start').val(),
+            len: $('#len').val(),
+            accuracy: $('#accuracy').val(),
+            offset: $('#offset').val(),
+            interest: $('#interest').val(),
+            data_type: $('#data_type').val(),
+            curve_checked: !!$('#curves').is(':checked')
+        };
+        for (const v in requests_data) {
+            if (v === 'curve_checked') continue;
+            if (!requests_data[v]) {
+                return layer.msg("请完整的填写数据", { icon: 2, time: 900 });
+            }
+        }
+        // 多曲线重复名保护（保持你的逻辑）
+        if (requests_data['curve_checked'] && (curve_data?.legend && curve_data.legend.includes(requests_data['curve_name']))) {
+            return layer.msg("曲线已存在", { icon: 0, time: 900 });
+        }
+
+        // 解析数据：确保返回 [[t,value], ...]
+        let _data = Tools.data_parse(parent_context[requests_data['can_id']], requests_data);
+        _data = (_data || []).slice().sort((a, b) => a[0] - b[0]);  // 按时间升序
+
+        // === 新增：读取周期/容差（UI→perID→默认）并做丢帧检测 ===
+        const { T_ms, tol } = getDropCfgForCurrentID(select_can_id);
+        const drop = detectDropsFixedPeriod(_data, T_ms, tol);
+        const anno = buildDropAnnotations(drop.events, requests_data['curve_name']);
+
+        // —— 丢帧检测后（你已有 drop 变量）
+        const cid = requests_data['can_id'];
+        const cname = requests_data['curve_name'];
+
+        // 确保结构存在
+        export_data[cid] = export_data[cid] || { row: {} };
+        export_data[cid][cname] = export_data[cid][cname] || { requests_data: {} };
+
+        // 保存明细和汇总（CSV 导出要用）
+        export_data[cid][cname].drops = drop.events;        // 每条丢帧事件
+        export_data[cid][cname].drop_summary = drop.summary; // 汇总数据
+
+
+        // 你的导出数据逻辑（保持不变）
+        !export_data.hasOwnProperty(requests_data['can_id']) && (export_data[requests_data['can_id']] = { 'row': {} });
+        !export_data[requests_data['can_id']].hasOwnProperty(requests_data['curve_name']) &&
+            (export_data[requests_data['can_id']][requests_data['curve_name']] = { 'requests_data': {} });
+        export_data[requests_data['can_id']][requests_data['curve_name']]['requests_data'] = requests_data;
+        export_data[requests_data['can_id']]['row'] = parent_context[requests_data['can_id']];
+
+        // 合并数据（只在 series 上加了 markLine/markPoint，两行）
+        const newSeries = {
+            name: requests_data['curve_name'],
+            type: 'line',
+            smooth: true,
+            showSymbol: false,
+            clip: true,
+            symbol: 'none',
+            itemStyle: {
+                normal: {
+                    lineStyle: {
+                        // color: 'blue',
+                        width: 1
+                    }
+                }
+            },
+            data: _data,
+            // === 新增：丢帧标注 ===
+            markLine: anno.markLine,
+            markPoint: anno.markPoint
+        };
+
+        if (!requests_data['curve_checked']) {
+            curve_data.legend = [requests_data['curve_name']];
+            curve_data.series = [newSeries];
+        } else {
+            curve_data.legend.push(requests_data['curve_name']);
+            curve_data.series.push(newSeries);
+        }
+
+        // 可选：把统计打印到控制台（不改你的UI）
+        if (drop.summary) {
+            const s = drop.summary;
+            console.log(`[${requests_data['curve_name']}] 总帧=${s.N}, 周期=${s.T_ms}ms, 容差=${(s.tol * 100).toFixed(1)}%`
+                + `, 阈值=${s.thr_ms.toFixed(3)}ms, 丢帧事件=${drop.events.length}, `
+                + `估计缺帧=${s.totalMissing}, 最严重=${s.worst}, 丢帧率=${s.missRatio.toFixed(3)}%`);
+        }
+
+        // 渲染
+        draw_my_charts(curve_data);
+    }
+    // 显示模式：'stacked' = 上下分图（子图模式，有高度上限），'multiAxis' = 同图多Y轴
+    let DISPLAY_MODE = 'stacked';
+
+    function toggle_mode() {
+        DISPLAY_MODE = (DISPLAY_MODE === 'stacked') ? 'multiAxis' : 'stacked';
+        // 更新按钮文案
+        const btn = document.getElementById('toggle_mode_btn');
+        btn.textContent = '切换样式：' + (DISPLAY_MODE === 'stacked' ? '上下子图' : '同图多Y轴');
+        // 重新渲染
+        draw_my_charts(curve_data);
+    }
+
+    /**
+     * 数据导出
+     */
+    function data_export() {
+        // console.log(export_data)
+        Tools.data_export(export_data)
+        console.log("导出");
+        export_drop_csv_all();
+    }
+
+    /**
+     * 渲染曲线
+     * 新增 多曲线并列模式
+     * @param curve_data
+     */
+    function draw_my_charts(curve_data) {
+        if (!curve_data || !curve_data.series || !curve_data.series.length) return;
+        if (DISPLAY_MODE === 'stacked') {
+            draw_stacked(curve_data);      // 上下分图（子图模式，最大高度800）
+        } else {
+            draw_multi_axis(curve_data);   // 同图多Y轴
+        }
+    }
+
+    /**
+     * 渲染：上下分开子图 + 动态高度（最大 800px）
+     */
+    function draw_stacked(curve_data) {
+        const n = curve_data.series.length;
+        if (n === 0) return;
+
+        // 按曲线数动态高度，但限制在 [MIN, MAX]
+        const PER_SERIES = 260;
+        const MIN_HEIGHT = 320;
+        const MAX_HEIGHT = 800;
+        const chartHeight = Math.max(MIN_HEIGHT, Math.min(MAX_HEIGHT, PER_SERIES * n));
+        const curveEl = document.getElementById('curve');
+        curveEl.style.height = chartHeight + 'px';
+        myChart.resize();
+
+        // 多 grid / 多轴布局
+        const grids = [];
+        const xAxes = [];
+        const yAxes = [];
+        const series = [];
+
+        const topMargin = 6, gap = 3, bottomMargin = 8;
+        const avail = 100 - topMargin - bottomMargin - (n - 1) * gap;
+        const hPct = avail / n;
+
+        for (let idx = 0; idx < n; idx++) {
+            const s = curve_data.series[idx];
+
+            grids.push({
+                top: (topMargin + idx * (hPct + gap)) + '%',
+                height: hPct + '%',
+                left: 60,
+                right: 60
+            });
+
+            xAxes.push({
+                type: 'value',
+                gridIndex: idx,
+                name: idx === n - 1 ? '时间 s' : '',
+                axisLabel: { show: idx === n - 1 },
+                minorTick: { show: true },
+                minorSplitLine: { show: false }
+            });
+
+            yAxes.push({
+                type: 'value',
+                gridIndex: idx,
+                name: s.name,
+                splitLine: { show: true, lineStyle: { color: '#eee' } },
+                minorTick: { show: true },
+                minorSplitLine: { show: false }
+            });
+
+            series.push({
+                name: s.name,
+                type: 'line',
+                data: s.data,
+                xAxisIndex: idx,
+                yAxisIndex: idx,
+                smooth: true,
+                showSymbol: false,
+                clip: true,
+                symbol: 'none',
+                itemStyle: s.itemStyle || undefined,
+                markLine: s.markLine || undefined
+            });
+        }
+
+        const xIndexAll = Array.from({ length: n }, (_, i) => i);
+
+        const option = {
+            tooltip: { trigger: 'axis', axisPointer: { type: 'cross' } },
+            legend: { type: 'scroll', data: curve_data.legend, top: 0 },
+            grid: grids,
+            xAxis: xAxes,
+            yAxis: yAxes,
+            series,
+            dataZoom: [
+                { type: 'slider', xAxisIndex: xIndexAll, bottom: 0, height: 22 },
+                { type: 'inside', xAxisIndex: xIndexAll }
+            ],
+            animation: false
+        };
+
+        myChart.setOption(option, true);
+    }
+
+    /**
+ * 渲染：原始样式（单画布、单 Y 轴，所有曲线同轴）
+ * 说明：清理 series 上可能残留的 yAxisIndex，恢复到你最初的单轴风格
+ */
+    function draw_multi_axis(curve_data) {
+        if (!curve_data || !curve_data.series || !curve_data.series.length) return;
+
+        // 画布高度：原始样式用固定高度（你之前是 600px，可按需调整）
+        const curveEl = document.getElementById('curve');
+        if (!curveEl.style.height) curveEl.style.height = '600px';
+        myChart.resize();
+
+        // 清理之前多 Y 轴模式可能加过的 yAxisIndex
+        curve_data.series.forEach(s => { if ('yAxisIndex' in s) delete s.yAxisIndex; });
+
+        const option = {
+            legend: {
+                type: 'scroll',
+                data: curve_data.legend
+            },
+            animation: false,
+            grid: {
+                top: 40,
+                left: 50,
+                right: 120,
+                bottom: 50
+            },
+            dataZoom: [
+                {
+                    show: true,
+                    type: 'inside',
+                    filterMode: 'none',
+                    xAxisIndex: [0],
+                }, {
+                    show: true,
+                    type: 'inside',
+                    filterMode: 'none',
+                    yAxisIndex: [0],
+                }, {
+                    type: 'slider',
+                    show: true,
+                    xAxisIndex: [0],
+                    start: 0,
+                    end: 100
+                },
+                {
+                    type: 'slider',
+                    show: true,
+                    yAxisIndex: [0],
+                    left: '93%',
+                    start: 0,
+                    end: 100
+                }
+            ],
+            toolbox: {
+                show: true,
+                feature: {
+                    dataZoom: { show: true },
+                }
+            },
+            tooltip: {
+                axisPointer: { type: 'cross' },
+                trigger: 'axis'
+            },
+            // 原始样式的 x 轴就按你之前的写法（不强制 type）
+            xAxis: {
+                name: "时间 s",
+                minorTick: { show: true },
+                splitLine: { lineStyle: { color: '#999' } },
+                minorSplitLine: { show: true, lineStyle: { color: '#ddd' } }
+            },
+            // 单一 Y 轴
+            yAxis: {
+                minorTick: { show: true },
+                splitLine: { lineStyle: { color: '#999' } },
+                minorSplitLine: { show: true, lineStyle: { color: '#ddd' } }
+            },
+            // 直接使用原有 series（已清理 yAxisIndex）
+            series: curve_data.series
+        };
+
+        myChart.setOption(option, true);
+    }
+
+    // === 丢帧检测全局配置（不改你的UI；可在这里改默认值或做每ID配置） ===
+    const DROP_CFG = {
+        default_T_ms: 10,   // 全局默认周期(ms)，可改
+        tol: 0.15,          // 全局默认容差(0~1)，可改
+        perID: {
+            // '0x123': 20,   // 对某个 CAN ID 指定专用周期(ms)
+            // '0x456': 5,
+        }
+    };
+    // 从UI读取周期/容差；若留空→使用 perID；还没有→使用默认
+    function getDropCfgForCurrentID(select_can_id) {
+        const elT = document.getElementById('cfg_period_ms');
+        const elTol = document.getElementById('cfg_tol');
+        let T = NaN, tol = NaN;
+
+        if (elT && elT.value !== '') {
+            const v = parseFloat(elT.value);
+            if (Number.isFinite(v) && v > 0) T = v;
+        }
+        if (elTol && elTol.value !== '') {
+            const v = parseFloat(elTol.value);
+            if (Number.isFinite(v) && v >= 0) tol = v;
+        }
+        if (!Number.isFinite(T) || T <= 0) {
+            const per = DROP_CFG.perID && DROP_CFG.perID[select_can_id];
+            T = (typeof per === 'number' && per > 0) ? per : DROP_CFG.default_T_ms;
+        }
+        if (!Number.isFinite(tol) || tol < 0) tol = DROP_CFG.tol;
+
+        return { T_ms: T, tol };
+    }
+
+    // 固定周期 + 容差：从 [t, y] 数组中检测丢帧（不依赖UI）
+    function detectDropsFixedPeriod(dataXY, T_ms, tol = 0.15) {
+        if (!Array.isArray(dataXY) || dataXY.length < 2) return { events: [], summary: null };
+        const T = T_ms, thr = T * (1 + tol);
+        const evts = [];
+        let totalMissing = 0, worst = 0;
+
+        for (let i = 0; i < dataXY.length - 1; i++) {
+            const t0 = dataXY[i][0] * 1000;  // s → ms
+            const t1 = dataXY[i + 1][0] * 1000;
+            const dt = t1 - t0;
+            if (dt > thr) {
+                let miss = Math.round(dt / T) - 1;
+                if (miss < 1) miss = 1;
+                totalMissing += miss;
+                worst = Math.max(worst, miss);
+                evts.push({ idx: i, t0_s: t0 / 1000, t1_s: t1 / 1000, dt_ms: dt, miss });
+            }
+        }
+        const N = dataXY.length;
+        const missRatio = (totalMissing / (N + totalMissing)) * 100;
+        return { events: evts, summary: { N, T_ms: T, tol, thr_ms: thr, totalMissing, worst, missRatio } };
+    }
+
+    // 生成 ECharts 标注（竖线 + “缺N帧”点），不改变你的线条样式
+    function buildDropAnnotations(events, seriesName) {
+        if (!events.length) return { markLine: undefined, markPoint: undefined };
+
+        const lines = [];
+        events.forEach(e => {
+            lines.push([{ xAxis: e.t0_s }, { xAxis: e.t0_s }]);
+            lines.push([{ xAxis: e.t1_s }, { xAxis: e.t1_s }]);
+        });
+
+        const points = events.map(e => ({
+            name: 'drop',
+            coord: [e.t1_s, NaN],
+            value: e.miss,
+            label: { formatter: p => `缺${p.value}帧`, position: 'top' },
+            tooltip: {
+                formatter: () =>
+                    `${seriesName || ''}<br/>t0=${e.t0_s.toFixed(6)}s → t1=${e.t1_s.toFixed(6)}s` +
+                    `<br/>Δt=${e.dt_ms.toFixed(3)}ms  缺${e.miss}帧`
+            },
+            symbolSize: 8
+        }));
+
+        return {
+            markLine: { silent: true, lineStyle: { type: 'dashed', width: 1 }, data: lines },
+            markPoint: { symbol: 'circle', data: points }
+        };
+    }
+    function export_drop_csv_all() {
+        if (!export_data || typeof export_data !== 'object') {
+            console.warn('export_data 不可用'); return;
+        }
+        const rows = [];
+        rows.push([
+            'can_id', 'curve_name',
+            'idx', 't0_s', 't1_s', 't0_ms', 't1_ms',
+            'delta_t_ms', 'missing_frames',
+            'period_ms', 'tolerance', 'threshold_ms',
+            'total_missing', 'worst_missing', 'drop_events', 'drop_rate_percent',
+            'missing_ts_ms' // 估算的缺失时间戳（毫秒，分号分隔）
+        ]);
+
+        let any = false;
+        Object.keys(export_data).forEach(cid => {
+            const group = export_data[cid];
+            if (!group || typeof group !== 'object') return;
+            Object.keys(group).forEach(cname => {
+                if (cname === 'row') return;
+                const node = group[cname];
+                if (!node || !node.drop_summary) return;
+
+                const drops = node.drops || [];
+                const sum = node.drop_summary || {};
+                const baseTail = [
+                    safeNum(sum.T_ms),
+                    safeNum(sum.tol),
+                    safeNum(sum.thr_ms),
+                    safeNum(sum.totalMissing),
+                    safeNum(sum.worst),
+                    safeNum(drops.length),
+                    safeNum(sum.missRatio)
+                ];
+
+                if (!drops.length) {
+                    rows.push([cid, cname, '', '', '', '', '', '', '', ...baseTail, '']);
+                    return;
+                }
+
+                drops.forEach(ev => {
+                    // 估算缺失的理想时间戳列表（毫秒）
+                    const missList = [];
+                    const T = sum.T_ms;
+                    if (Number.isFinite(T) && T > 0) {
+                        const t0_ms = ev.t0_s * 1000;
+                        for (let k = 1; k <= ev.miss; k++) missList.push((t0_ms + k * T).toFixed(3));
+                    }
+                    rows.push([
+                        cid, cname,
+                        safeNum(ev.idx),
+                        safeNum(ev.t0_s),
+                        safeNum(ev.t1_s),
+                        (ev.t0_s * 1000).toFixed(3),
+                        (ev.t1_s * 1000).toFixed(3),
+                        safeNum(ev.dt_ms),
+                        safeNum(ev.miss),
+                        ...baseTail,
+                        missList.join(';')
+                    ]);
+                });
+                any = true;
+            });
+        });
+
+        if (!any) {
+            console.warn('没有可导出的丢帧明细。请先提交并生成检测结果。');
+            if (window.layer && layer.msg) layer.msg('没有可导出的丢帧明细。请先提交并生成检测结果。', { icon: 0, time: 1500 });
+            return;
+        }
+
+        const csv = rows.map(r => r.map(csvField).join(',')).join('\r\n');
+        const blob = new Blob(['\uFEFF' + csv], { type: 'text/csv;charset=utf-8;' });
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        const ts = new Date();
+        a.href = url;
+        a.download = `drops_${ts.getFullYear()}${pad2(ts.getMonth() + 1)}${pad2(ts.getDate())}_${pad2(ts.getHours())}${pad2(ts.getMinutes())}${pad2(ts.getSeconds())}.csv`;
+        document.body.appendChild(a); a.click();
+        setTimeout(() => { URL.revokeObjectURL(url); a.remove(); }, 0);
+
+        function safeNum(x) { return (x == null || Number.isNaN(x)) ? '' : (typeof x === 'number' ? x : Number(x)); }
+        function csvField(v) {
+            if (v == null) return '';
+            const s = String(v);
+            return /[\",\r\n]/.test(s) ? `"${s.replace(/\"/g, '""')}"` : s;
+        }
+        function pad2(n) { return (n < 10 ? '0' : '') + n; }
+    }
+</script>
