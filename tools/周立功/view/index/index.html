@@ -66,6 +66,7 @@
         <div class="d-grid gap-2">
             <button class="btn btn-primary" type="button" onclick="submit()">提交</button>
             <button class="btn btn-outline-success" type="button" onclick="data_export()">数据导出</button>
+            <button class="btn btn-outline-success" type="button" onclick="drop_data_export()">丢帧导出</button>
             <button class="btn btn-secondary" type="button" id="toggle_mode_btn"
                 onclick="toggle_mode()">切换样式：上下子图</button>
         </div>
@@ -249,9 +250,15 @@
         // console.log(export_data)
         Tools.data_export(export_data)
         console.log("导出");
-        export_drop_csv_all();
+        //export_drop_csv_all();
     }
-
+    /**
+     * 丢帧数据导出
+     */
+    function drop_data_export() {
+        export_drop_csv_all();
+        console.log("丢帧导出");
+    }
     /**
      * 渲染曲线
      * 新增 多曲线并列模式
