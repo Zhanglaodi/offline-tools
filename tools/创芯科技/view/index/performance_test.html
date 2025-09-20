@@ -1,0 +1,471 @@
+<!-- Bootstrap 的 CSS 文件 -->
+<link href="../../lib/bootstrap/bootstrap.min.css" rel="stylesheet">
+
+<style>
+    .row {
+        width: 100%;
+    }
+</style>
+<div class="row">
+    <!-- 菜单 -->
+    <div class="col-md-3 col-sm-6">
+        <div class="input-group mb-3 ">
+            <span class="input-group-text">曲线名称</span>
+            <input type="text" class="form-control" id="curve_name" placeholder="第一条曲线">
+        </div>
+    </div>
+    <div class="col-md-3 col-sm-6">
+        <div class="input-group mb-3 ">
+            <span class="input-group-text">CAN &nbsp;ID</span>
+            <div id="can_id" class="form-control"></div>
+            <!--            <select class="form-select" id="can_id"> </select>-->
+        </div>
+    </div>
+    <div class="col-md-3 col-sm-6">
+        <div class="input-group mb-3 ">
+            <span class="input-group-text">开&nbsp;始&nbsp;位&nbsp;</span>
+            <input type="number" class="form-control" id="start" value="">
+        </div>
+    </div>
+    <div class="col-md-3 col-sm-6">
+        <div class="input-group mb-3 ">
+            <span class="input-group-text">长&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;度&nbsp;</span>
+            <input type="number" class="form-control" id="len" value="">
+        </div>
+    </div>
+</div>
+<div class="row">
+    <!-- 菜单 -->
+    <div class="col-md-3 col-sm-6">
+        <div class="input-group mb-3 ">
+            <span class="input-group-text">精&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; 度</span>
+            <input type="number" class="form-control" id="accuracy" value="">
+        </div>
+    </div>
+    <div class="col-md-3 col-sm-6">
+        <div class="input-group mb-3 ">
+            <span class="input-group-text">偏 移 量&nbsp;</span>
+            <input type="number" class="form-control" id="offset" value="">
+        </div>
+    </div>
+    <div class="col-md-3 col-sm-6">
+        <div class="input-group mb-3 ">
+            <span class="input-group-text">协议类型</span>
+            <select class="form-select" id="interest">
+                <option value="intel" selected="">intel</option>
+                <option value="motorola">motorola</option>
+            </select>
+        </div>
+    </div>
+    <div class="col-md-3 col-sm-6">
+        <div class="input-group mb-3 ">
+            <span class="input-group-text">数据类型</span>
+            <select class="form-select" id="data_type">
+                <option value="unsigned" selected="">unsigned</option>
+                <option value="signed">signed</option>
+            </select>
+        </div>
+    </div>
+</div>
+<hr>
+<div class="row">
+    <!-- 菜单 -->
+    <div class="col-md-3 col-sm-6">
+        <div class="input-group mb-3 ">
+            <span class="input-group-text">曲线名称</span>
+            <input type="text" class="form-control" id="curve_name_2" placeholder="第二条曲线">
+        </div>
+    </div>
+    <div class="col-md-3 col-sm-6">
+        <div class="input-group mb-3">
+            <span class="input-group-text">CAN &nbsp;ID</span>
+            <div id="can_id_2" class="form-control"></div>
+            <!--            <select class="form-select" id="can_id_2"> </select>-->
+        </div>
+    </div>
+    <div class="col-md-3 col-sm-6">
+        <div class="input-group mb-3">
+            <span class="input-group-text">开&nbsp;始&nbsp;位&nbsp;</span>
+            <input type="number" class="form-control" id="start_2" value="">
+        </div>
+    </div>
+    <div class="col-md-3 col-sm-6">
+        <div class="input-group mb-3">
+            <span class="input-group-text">长&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;度&nbsp;</span>
+            <input type="number" class="form-control" id="len_2" value="">
+        </div>
+    </div>
+</div>
+<div class="row">
+    <!-- 菜单 -->
+    <div class="col-md-3 col-sm-6">
+        <div class="input-group mb-3 ">
+            <span class="input-group-text">精&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; 度</span>
+            <input type="number" class="form-control" id="accuracy_2" value="">
+        </div>
+    </div>
+    <div class="col-md-3 col-sm-6">
+        <div class="input-group mb-3 ">
+            <span class="input-group-text">偏 移 量&nbsp;</span>
+            <input type="number" class="form-control" id="offset_2" value="">
+        </div>
+    </div>
+    <div class="col-md-3 col-sm-6">
+        <div class="input-group mb-3">
+            <span class="input-group-text">协议类型</span>
+            <select class="form-select" id="interest_2">
+                <option value="intel" selected="">intel</option>
+                <option value="motorola">motorola</option>
+            </select>
+        </div>
+    </div>
+    <div class="col-md-3 col-sm-6">
+        <div class="input-group mb-3 ">
+            <span class="input-group-text">数据类型</span>
+            <select class="form-select" id="data_type_2">
+                <option value="unsigned" selected="">unsigned</option>
+                <option value="signed">signed</option>
+            </select>
+        </div>
+    </div>
+</div>
+<div class="d-grid gap-2">
+    <button class="btn btn-primary" type="button" onclick="submit()">提交</button>
+</div>
+<hr>
+<div class="row">
+    <div class="col">
+        <!-- 曲线 -->
+        <div id="curve" style="height: 600px"></div>
+    </div>
+</div>
+
+
+<!-- 引入 JQuery -->
+<script src="../../lib/jquery/jquery.min.js"></script>
+<!-- 引入 Layer -->
+<script src="../../lib/layer/layer.js"></script>
+<!-- 引入 Echarts.js -->
+<script src="../../lib/echarts-5.3.3/echarts.min.js"></script>
+<!-- 引入公共方法 -->
+<script src="../../js/common.js"></script>
+<!-- 引入 xm-select  -->
+<script src="../../lib/xm-select/xm-select.js"></script>
+
+<script>
+    // 全部数据内容
+    let parent_context = [];
+    // 所有的can_id
+    let can_id = [];
+    // 选中的can_id
+    let select_can_id = "";
+    // 选中的can_id_2
+    let select_can_id_2 = "";
+    // 所有曲线数据
+    let curve_data = {legend: [], series: []};
+    // eCharts 曲线实例
+    let myChart = echarts.init($('#curve')[0], null, {
+        renderer: 'canvas',
+        useDirtyRect: false
+    })
+    // 注册 曲线实例自适应事件
+    window.addEventListener('resize', myChart.resize);
+
+    // 注册消息事件监听，接受父元素给的数据
+    window.addEventListener('message', (e) => {
+        parent_context = e.data['file_context'];
+        can_id = e.data['can_id'];
+        xmSelect.render({
+            el: '#can_id',
+            model: {
+                label: {type: 'text'}
+            },
+            filterable: true,
+            radio: true,
+            clickClose: true,
+            data: can_id.map((v) => {
+                return {
+                    "name": v,
+                    "value": v
+                };
+            }),
+            on: function (data) {
+                if (data.isAdd) {
+                    select_can_id = data.arr[0]['value'];
+                } else {
+                    select_can_id = "";
+                }
+            }
+        });
+        xmSelect.render({
+            el: '#can_id_2',
+            model: {
+                label: {type: 'text'}
+            },
+            filterable: true,
+            radio: true,
+            clickClose: true,
+            data: can_id.map((v) => {
+                return {
+                    "name": v,
+                    "value": v
+                };
+            }),
+            on: function (data) {
+                if (data.isAdd) {
+                    select_can_id_2 = data.arr[0]['value'];
+                } else {
+                    select_can_id_2 = "";
+                }
+            }
+        });
+    }, false);
+
+    /**
+     * 提交
+     */
+    function submit() {
+        // 收集数据 1
+        let requests_data = {
+            curve_name: $('#curve_name').val(),
+            can_id: select_can_id,
+            start: $('#start').val(),
+            len: $('#len').val(),
+            accuracy: $('#accuracy').val(),
+            offset: $('#offset').val(),
+            interest: $('#interest').val(),
+            data_type: $('#data_type').val(),
+            curve_checked: !!$('#curves').is(':checked')
+        }
+        for (const v in requests_data) {
+            if (v === 'curve_checked') {
+                // console.log(1)
+                continue
+            }
+            if (!requests_data[v]) {
+                return layer.msg("请完整的填写数据", {icon: 2, time: 900})
+            }
+        }
+        // 收集数据 2
+        let requests_data_2 = {
+            curve_name: $('#curve_name_2').val(),
+            can_id: select_can_id_2,
+            start: $('#start_2').val(),
+            len: $('#len_2').val(),
+            accuracy: $('#accuracy_2').val(),
+            offset: $('#offset_2').val(),
+            interest: $('#interest_2').val(),
+            data_type: $('#data_type_2').val(),
+            curve_checked: !!$('#curves_2').is(':checked')
+        }
+        console.log(requests_data_2)
+        for (const v in requests_data_2) {
+            if (v === 'curve_checked') {
+                // console.log(1)
+                continue
+            }
+            if (!requests_data_2[v]) {
+                return layer.msg("请完整的填写数据", {icon: 2, time: 900})
+            }
+        }
+
+        // 判断曲线名称是否存在
+        if (requests_data['curve_name'] === requests_data_2['curve_name']) {
+            return layer.msg("曲线名称重复", {icon: 0, time: 900})
+        }
+
+        let _data = Tools.data_parse(parent_context[requests_data['can_id']], requests_data)
+        let _data_2 = Tools.data_parse(parent_context[requests_data_2['can_id']], requests_data_2)
+
+        curve_data.legend = [requests_data['curve_name'], requests_data_2['curve_name']];
+        curve_data.series = [{
+            name: requests_data['curve_name'],
+            type: 'line',
+            smooth: true,
+            // symbol: 'none',
+            // stack: 'a',
+            markLine: {
+                silent: true,
+                data: 1
+            },
+            itemStyle: {
+                normal: {
+                    lineStyle: {
+                        color: 'green',
+                        width: 1
+                    }
+                }
+            },
+            data: _data,
+        }, {
+            name: requests_data_2['curve_name'],
+            type: 'line',
+            smooth: true,
+            // symbol: 'none',
+            // stack: 'a',
+            markLine: {
+                silent: true,
+                data: 1
+            },
+            itemStyle: {
+                normal: {
+                    lineStyle: {
+                        color: 'green',
+                        width: 1
+                    }
+                }
+            },
+            data: _data_2,
+        }];
+        // 渲染数据
+        draw_my_charts(curve_data)
+    }
+
+    // draw_my_charts({
+    //     legend: ['test', 'test1'],
+    //     series: [{
+    //         name: 'test',
+    //         type: 'line',
+    //         smooth: true,
+    //         // symbol: 'none',
+    //         // stack: 'a',
+    //         markLine: {
+    //             silent: true,
+    //             data: 1
+    //         },
+    //         itemStyle: {
+    //             normal: {
+    //                 lineStyle: {
+    //                     color: '"blue"',
+    //                     width: 1
+    //                 }
+    //             }
+    //         },
+    //         data: [
+    //             [1, 2],
+    //             [3, 5]
+    //         ],
+    //     }, {
+    //         name: 'test1',
+    //         type: 'line',
+    //         smooth: true,
+    //         // symbol: 'none',
+    //         // stack: 'a',
+    //         markLine: {
+    //             silent: true,
+    //             data: 1
+    //         },
+    //         itemStyle: {
+    //             normal: {
+    //                 lineStyle: {
+    //                     color: 'green',
+    //                     width: 1
+    //                 }
+    //             }
+    //         },
+    //         data: [
+    //             [1, 2],
+    //             [3, 25]
+    //         ],
+    //     }]
+    // })
+
+    /**
+     * 渲染曲线
+     * @param curve_data
+     */
+    function draw_my_charts(curve_data) {
+        let option = {
+            legend: {
+                type: 'scroll',
+                data: curve_data.legend
+            },
+            animation: false,
+            grid: {
+                top: 40,
+                left: 50,
+                right: 120,
+                bottom: 50
+            },
+            dataZoom: [
+                {
+                    show: true,
+                    type: 'inside',
+                    filterMode: 'none',
+                    xAxisIndex: [0],
+                }, {
+                    show: true,
+                    type: 'inside',
+                    filterMode: 'none',
+                    yAxisIndex: [0],
+                }, {
+                    type: 'slider',
+                    show: true,
+                    xAxisIndex: [0],
+                    start: 0,
+                    end: 100
+                },
+                {
+                    type: 'slider',
+                    show: true,
+                    yAxisIndex: [0],
+                    left: '93%',
+                    start: 0,
+                    end: 100
+                }
+            ],
+            toolbox: {
+                show: true,
+                feature: {
+                    dataZoom: {
+                        show: true
+                    },
+                }
+            },
+            tooltip: {
+                axisPointer: {//十字标
+                    type: 'cross',
+                },
+                trigger: 'axis'//跟随鼠标指针显示数据
+            },
+            xAxis: {
+                type: 'value',
+                name: "时间 s",
+                minorTick: {
+                    show: true
+                },
+                splitLine: {
+                    lineStyle: {
+                        color: '#999'
+                    }
+                },
+                minorSplitLine: {
+                    show: true,
+                    lineStyle: {
+                        color: '#ddd'
+                    }
+                }
+            },
+            yAxis: {
+                minorTick: {
+                    show: true
+                },
+                splitLine: {
+                    lineStyle: {
+                        color: '#999'
+                    }
+                },
+                minorSplitLine: {
+                    show: true,
+                    lineStyle: {
+                        color: '#ddd'
+                    }
+                }
+            },
+            series: curve_data.series
+        };
+        if (option && typeof option === 'object') {
+            myChart.setOption(option,true);
+        }
+    }
+</script>
