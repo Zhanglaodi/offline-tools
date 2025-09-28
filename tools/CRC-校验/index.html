@@ -1,0 +1,613 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>CRC校验工具</title>
+    <style>
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
+            -webkit-tap-highlight-color: transparent;
+        }
+        
+        body {
+            background: linear-gradient(135deg, #1a2a6c, #b21f1f, #fdbb2d);
+            color: #333;
+            min-height: 100vh;
+            padding: 10px;
+            line-height: 1.5;
+        }
+        
+        .container {
+            max-width: 100%;
+            margin: 0 auto;
+            background-color: rgba(255, 255, 255, 0.98);
+            border-radius: 12px;
+            box-shadow: 0 5px 20px rgba(0, 0, 0, 0.15);
+            overflow: hidden;
+        }
+        
+        header {
+            background: linear-gradient(90deg, #2c3e50, #4a6491);
+            color: white;
+            padding: 15px 10px;
+            text-align: center;
+        }
+        
+        h1 {
+            font-size: 1.8rem;
+            margin-bottom: 8px;
+            font-weight: 600;
+        }
+        
+        .subtitle {
+            font-size: 0.9rem;
+            opacity: 0.9;
+            padding: 0 10px;
+        }
+        
+        .main-content {
+            display: flex;
+            flex-direction: column;
+            padding: 15px;
+        }
+        
+        .config-panel, .input-panel {
+            width: 100%;
+            padding: 15px;
+            background-color: #f8f9fa;
+            border-radius: 10px;
+            margin-bottom: 15px;
+        }
+        
+        .section-title {
+            font-size: 1.3rem;
+            margin-bottom: 12px;
+            color: #2c3e50;
+            border-bottom: 2px solid #3498db;
+            padding-bottom: 6px;
+            font-weight: 600;
+        }
+        
+        .form-group {
+            margin-bottom: 12px;
+        }
+        
+        label {
+            display: block;
+            margin-bottom: 5px;
+            font-weight: 600;
+            color: #34495e;
+            font-size: 0.95rem;
+        }
+        
+        select, input, textarea {
+            width: 100%;
+            padding: 12px;
+            border: 1px solid #ddd;
+            border-radius: 6px;
+            font-size: 1rem;
+            -webkit-appearance: none;
+            appearance: none;
+        }
+        
+        select {
+            background-image: url("data:image/svg+xml;charset=UTF-8,%3csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%23333' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3e%3cpolyline points='6 9 12 15 18 9'%3e%3c/polyline%3e%3c/svg%3e");
+            background-repeat: no-repeat;
+            background-position: right 12px center;
+            background-size: 16px;
+            padding-right: 40px;
+        }
+        
+        textarea {
+            height: 120px;
+            resize: vertical;
+            font-family: monospace;
+            min-height: 100px;
+        }
+        
+        .checkbox-group {
+            display: flex;
+            align-items: center;
+            margin-bottom: 10px;
+            padding: 8px 0;
+        }
+        
+        .checkbox-group input {
+            width: 22px;
+            height: 22px;
+            margin-right: 10px;
+            flex-shrink: 0;
+        }
+        
+        .checkbox-group label {
+            margin-bottom: 0;
+        }
+        
+        .btn {
+            background: linear-gradient(90deg, #3498db, #2980b9);
+            color: white;
+            border: none;
+            padding: 14px 20px;
+            border-radius: 6px;
+            cursor: pointer;
+            font-size: 1.1rem;
+            font-weight: 600;
+            transition: all 0.3s;
+            display: block;
+            text-align: center;
+            width: 100%;
+            margin-top: 10px;
+            touch-action: manipulation;
+        }
+        
+        .btn:active {
+            background: linear-gradient(90deg, #2980b9, #2573a7);
+            transform: translateY(1px);
+        }
+        
+        .result-box {
+            margin-top: 15px;
+            padding: 12px;
+            background-color: #e8f4fc;
+            border-radius: 6px;
+            border-left: 4px solid #3498db;
+        }
+        
+        .result-title {
+            font-weight: 600;
+            margin-bottom: 8px;
+            color: #2c3e50;
+            font-size: 1rem;
+        }
+        
+        .result-value {
+            font-family: monospace;
+            font-size: 1.1rem;
+            background-color: #2c3e50;
+            color: #fff;
+            padding: 10px;
+            border-radius: 5px;
+            word-break: break-all;
+            overflow-wrap: break-word;
+            line-height: 1.4;
+        }
+        
+        .crc-info {
+            margin-top: 15px;
+            padding: 12px;
+            background-color: #fff8e1;
+            border-radius: 6px;
+            font-size: 0.85rem;
+            border-left: 4px solid #f39c12;
+        }
+        
+        .hex-display {
+            font-family: monospace;
+            background-color: #f5f5f5;
+            padding: 8px;
+            border-radius: 4px;
+            margin-top: 5px;
+            font-size: 0.9rem;
+            word-break: break-all;
+            overflow-wrap: break-word;
+            line-height: 1.4;
+        }
+        
+        /* 平板和桌面布局 */
+        @media (min-width: 768px) {
+            body {
+                padding: 20px;
+            }
+            
+            .main-content {
+                flex-direction: row;
+            }
+            
+            .config-panel {
+                flex: 1;
+                margin-right: 15px;
+                margin-bottom: 0;
+            }
+            
+            .input-panel {
+                flex: 2;
+                margin-bottom: 0;
+            }
+            
+            h1 {
+                font-size: 2.2rem;
+            }
+            
+            .subtitle {
+                font-size: 1rem;
+            }
+        }
+        
+        /* 小屏幕手机优化 */
+        @media (max-width: 360px) {
+            h1 {
+                font-size: 1.6rem;
+            }
+            
+            .section-title {
+                font-size: 1.2rem;
+            }
+            
+            select, input, textarea {
+                padding: 10px;
+                font-size: 0.95rem;
+            }
+            
+            .btn {
+                padding: 12px 15px;
+                font-size: 1rem;
+            }
+        }
+        
+        /* 防止iOS缩放 */
+        @media screen and (-webkit-min-device-pixel-ratio:0) {
+            select,
+            textarea,
+            input {
+                font-size: 16px !important;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <header>
+            <h1>CRC校验工具</h1>
+            <p class="subtitle">支持CRC-8、CRC-16、CRC-32等多种算法 | 支持自定义参数</p>
+        </header>
+        
+        <div class="main-content">
+            <div class="config-panel">
+                <h2 class="section-title">CRC参数配置</h2>
+                
+                <div class="form-group">
+                    <label for="crc-type">选择CRC算法:</label>
+                    <select id="crc-type">
+                        <option value="custom">自定义CRC</option>
+                        <option value="crc8">CRC-8</option>
+                        <option value="crc8_cdma2000">CRC-8/CDMA2000</option>
+                        <option value="crc8_darc">CRC-8/DARC</option>
+                        <option value="crc16">CRC-16</option>
+                        <option value="crc16_ccitt">CRC-16/CCITT</option>
+                        <option value="crc16_modbus">CRC-16/MODBUS</option>
+                        <option value="crc32">CRC-32</option>
+                        <option value="crc32c">CRC-32C</option>
+                    </select>
+                </div>
+                
+                <div class="form-group">
+                    <label for="polynomial">多项式 (十六进制):</label>
+                    <input type="text" id="polynomial" value="07" placeholder="例如: 07, 1021, 04C11DB7">
+                </div>
+                
+                <div class="form-group">
+                    <label for="initial-value">初始值 (十六进制):</label>
+                    <input type="text" id="initial-value" value="00" placeholder="例如: 00, FFFF">
+                </div>
+                
+                <div class="form-group">
+                    <label for="final-xor">结果异或值 (十六进制):</label>
+                    <input type="text" id="final-xor" value="00" placeholder="例如: 00, FFFF">
+                </div>
+                
+                <div class="checkbox-group">
+                    <input type="checkbox" id="input-reflect" checked>
+                    <label for="input-reflect">输入数据反射</label>
+                </div>
+                
+                <div class="checkbox-group">
+                    <input type="checkbox" id="result-reflect" checked>
+                    <label for="result-reflect">结果反射</label>
+                </div>
+                
+                <button id="calculate-btn" class="btn">计算CRC校验值</button>
+                
+                <div class="crc-info">
+                    <p><strong>当前算法信息:</strong></p>
+                    <p id="algorithm-info">选择算法后显示详细信息</p>
+                </div>
+            </div>
+            
+            <div class="input-panel">
+                <h2 class="section-title">输入数据</h2>
+                
+                <div class="form-group">
+                    <label for="input-type">输入类型:</label>
+                    <select id="input-type">
+                        <option value="text">文本</option>
+                        <option value="hex">十六进制</option>
+                    </select>
+                </div>
+                
+                <div class="form-group">
+                    <label for="input-data">输入数据:</label>
+                    <textarea id="input-data" placeholder="在此输入要计算CRC的数据...">Hello CRC!</textarea>
+                </div>
+                
+                <div class="form-group">
+                    <label>十六进制表示:</label>
+                    <div class="hex-display" id="hex-representation">48656C6C6F2043524321</div>
+                </div>
+                
+                <h2 class="section-title">计算结果</h2>
+                
+                <div class="result-box">
+                    <div class="result-title">CRC校验值:</div>
+                    <div class="result-value" id="crc-result">等待计算...</div>
+                </div>
+                
+                <div class="result-box">
+                    <div class="result-title">二进制表示:</div>
+                    <div class="result-value" id="binary-result">等待计算...</div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // CRC算法配置
+        const crcConfigs = {
+            'crc8': {
+                polynomial: '07',
+                initialValue: '00',
+                finalXor: '00',
+                inputReflect: false,
+                resultReflect: false,
+                info: 'CRC-8: 多项式 0x07，常用于通信协议'
+            },
+            'crc8_cdma2000': {
+                polynomial: '9B',
+                initialValue: 'FF',
+                finalXor: '00',
+                inputReflect: false,
+                resultReflect: false,
+                info: 'CRC-8/CDMA2000: 多项式 0x9B，用于CDMA2000系统'
+            },
+            'crc8_darc': {
+                polynomial: '39',
+                initialValue: '00',
+                finalXor: '00',
+                inputReflect: true,
+                resultReflect: true,
+                info: 'CRC-8/DARC: 多项式 0x39，用于数据广播'
+            },
+            'crc16': {
+                polynomial: '8005',
+                initialValue: '0000',
+                finalXor: '0000',
+                inputReflect: true,
+                resultReflect: true,
+                info: 'CRC-16: 多项式 0x8005，IBM标准'
+            },
+            'crc16_ccitt': {
+                polynomial: '1021',
+                initialValue: 'FFFF',
+                finalXor: '0000',
+                inputReflect: false,
+                resultReflect: false,
+                info: 'CRC-16/CCITT: 多项式 0x1021，通信协议常用'
+            },
+            'crc16_modbus': {
+                polynomial: '8005',
+                initialValue: 'FFFF',
+                finalXor: '0000',
+                inputReflect: true,
+                resultReflect: true,
+                info: 'CRC-16/MODBUS: 多项式 0x8005，工业控制协议'
+            },
+            'crc32': {
+                polynomial: '04C11DB7',
+                initialValue: 'FFFFFFFF',
+                finalXor: 'FFFFFFFF',
+                inputReflect: true,
+                resultReflect: true,
+                info: 'CRC-32: 多项式 0x04C11DB7，用于ZIP、PNG等'
+            },
+            'crc32c': {
+                polynomial: '1EDC6F41',
+                initialValue: 'FFFFFFFF',
+                finalXor: 'FFFFFFFF',
+                inputReflect: true,
+                resultReflect: true,
+                info: 'CRC-32C: 多项式 0x1EDC6F41，用于iSCSI、SCTP'
+            },
+            'custom': {
+                polynomial: '07',
+                initialValue: '00',
+                finalXor: '00',
+                inputReflect: true,
+                resultReflect: true,
+                info: '自定义CRC参数'
+            }
+        };
+
+        // DOM元素
+        const crcTypeSelect = document.getElementById('crc-type');
+        const polynomialInput = document.getElementById('polynomial');
+        const initialValueInput = document.getElementById('initial-value');
+        const finalXorInput = document.getElementById('final-xor');
+        const inputReflectCheckbox = document.getElementById('input-reflect');
+        const resultReflectCheckbox = document.getElementById('result-reflect');
+        const inputTypeSelect = document.getElementById('input-type');
+        const inputDataTextarea = document.getElementById('input-data');
+        const hexRepresentationDiv = document.getElementById('hex-representation');
+        const crcResultDiv = document.getElementById('crc-result');
+        const binaryResultDiv = document.getElementById('binary-result');
+        const calculateButton = document.getElementById('calculate-btn');
+        const algorithmInfoDiv = document.getElementById('algorithm-info');
+
+        // 更新十六进制表示
+        function updateHexRepresentation() {
+            const inputType = inputTypeSelect.value;
+            const inputData = inputDataTextarea.value;
+            
+            if (inputType === 'text') {
+                let hex = '';
+                for (let i = 0; i < inputData.length; i++) {
+                    const hexChar = inputData.charCodeAt(i).toString(16).toUpperCase();
+                    hex += (hexChar.length === 1 ? '0' + hexChar : hexChar) + ' ';
+                }
+                hexRepresentationDiv.textContent = hex.trim();
+            } else {
+                // 对于十六进制输入，只保留有效的十六进制字符
+                const cleanHex = inputData.replace(/[^0-9A-Fa-f]/g, '').toUpperCase();
+                let formattedHex = '';
+                for (let i = 0; i < cleanHex.length; i += 2) {
+                    formattedHex += cleanHex.substr(i, 2) + ' ';
+                }
+                hexRepresentationDiv.textContent = formattedHex.trim();
+            }
+        }
+
+        // 根据选择的CRC类型更新参数
+        function updateCrcParameters() {
+            const selectedType = crcTypeSelect.value;
+            const config = crcConfigs[selectedType];
+            
+            polynomialInput.value = config.polynomial;
+            initialValueInput.value = config.initialValue;
+            finalXorInput.value = config.finalXor;
+            inputReflectCheckbox.checked = config.inputReflect;
+            resultReflectCheckbox.checked = config.resultReflect;
+            algorithmInfoDiv.textContent = config.info;
+            
+            // 自定义类型时允许编辑
+            const isCustom = selectedType === 'custom';
+            polynomialInput.disabled = !isCustom;
+            initialValueInput.disabled = !isCustom;
+            finalXorInput.disabled = !isCustom;
+            inputReflectCheckbox.disabled = !isCustom;
+            resultReflectCheckbox.disabled = !isCustom;
+        }
+
+        // 反射函数（位反转）
+        function reflectBits(value, bitWidth) {
+            let reflected = 0;
+            for (let i = 0; i < bitWidth; i++) {
+                if (value & (1 << i)) {
+                    reflected |= (1 << (bitWidth - 1 - i));
+                }
+            }
+            return reflected;
+        }
+
+        // 计算CRC
+        function calculateCRC() {
+            try {
+                // 获取输入数据
+                const inputType = inputTypeSelect.value;
+                let inputData = inputDataTextarea.value;
+                
+                // 将输入数据转换为字节数组
+                let dataBytes = [];
+                if (inputType === 'text') {
+                    for (let i = 0; i < inputData.length; i++) {
+                        dataBytes.push(inputData.charCodeAt(i) & 0xFF);
+                    }
+                } else {
+                    // 十六进制输入
+                    const cleanHex = inputData.replace(/[^0-9A-Fa-f]/g, '');
+                    if (cleanHex.length % 2 !== 0) {
+                        throw new Error('十六进制数据长度必须是偶数');
+                    }
+                    
+                    for (let i = 0; i < cleanHex.length; i += 2) {
+                        dataBytes.push(parseInt(cleanHex.substr(i, 2), 16));
+                    }
+                }
+                
+                // 获取CRC参数
+                const polynomial = parseInt(polynomialInput.value, 16);
+                let crc = parseInt(initialValueInput.value, 16);
+                const finalXor = parseInt(finalXorInput.value, 16);
+                const inputReflect = inputReflectCheckbox.checked;
+                const resultReflect = resultReflectCheckbox.checked;
+                
+                // 确定CRC宽度（通过多项式的最高位）
+                let bitWidth = 8;
+                if (polynomial > 0xFFFFFF) bitWidth = 32;
+                else if (polynomial > 0xFFFF) bitWidth = 24;
+                else if (polynomial > 0xFF) bitWidth = 16;
+                
+                const topBit = 1 << (bitWidth - 1);
+                const mask = (1 << bitWidth) - 1;
+                
+                // 处理每个字节
+                for (let byte of dataBytes) {
+                    // 输入反射
+                    if (inputReflect) {
+                        byte = reflectBits(byte, 8);
+                    }
+                    
+                    // 与CRC高位异或
+                    crc ^= (byte << (bitWidth - 8));
+                    
+                    // 处理每个位
+                    for (let i = 0; i < 8; i++) {
+                        if (crc & topBit) {
+                            crc = (crc << 1) ^ polynomial;
+                        } else {
+                            crc = crc << 1;
+                        }
+                        crc &= mask;
+                    }
+                }
+                
+                // 结果反射
+                if (resultReflect) {
+                    crc = reflectBits(crc, bitWidth);
+                }
+                
+                // 最终异或
+                crc ^= finalXor;
+                crc &= mask;
+                
+                // 格式化结果
+                let hexResult = crc.toString(16).toUpperCase();
+                const expectedLength = bitWidth / 4;
+                while (hexResult.length < expectedLength) {
+                    hexResult = '0' + hexResult;
+                }
+                
+                // 显示结果
+                crcResultDiv.textContent = '0x' + hexResult;
+                
+                // 显示二进制结果
+                let binaryResult = crc.toString(2);
+                while (binaryResult.length < bitWidth) {
+                    binaryResult = '0' + binaryResult;
+                }
+                // 每4位添加空格
+                binaryResult = binaryResult.replace(/(.{4})/g, '$1 ').trim();
+                binaryResultDiv.textContent = binaryResult;
+                
+            } catch (error) {
+                crcResultDiv.textContent = '错误: ' + error.message;
+                binaryResultDiv.textContent = '计算失败';
+            }
+        }
+
+        // 事件监听
+        crcTypeSelect.addEventListener('change', updateCrcParameters);
+        inputTypeSelect.addEventListener('change', updateHexRepresentation);
+        inputDataTextarea.addEventListener('input', updateHexRepresentation);
+        calculateButton.addEventListener('click', calculateCRC);
+
+        // 初始化
+        updateCrcParameters();
+        updateHexRepresentation();
+        
+        // 页面加载后自动计算一次
+        window.addEventListener('load', calculateCRC);
+    </script>
+</body>
+</html>

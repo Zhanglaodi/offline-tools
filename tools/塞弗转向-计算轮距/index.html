@@ -1,0 +1,52 @@
+<!DOCTYPE html>
+<html lang="zh">
+<head>
+  <meta charset="UTF-8">
+  <title>公式计算器</title>
+  <style>
+    body { font-family: Arial, sans-serif; margin: 40px; }
+    label { display: block; margin: 10px 0 5px; }
+    input { padding: 5px; width: 150px; }
+    button { margin-top: 15px; padding: 8px 15px; }
+    #result { margin-top: 20px; font-weight: bold; color: blue; }
+  </style>
+</head>
+<body>
+  <h2>公式计算器</h2>
+  <p>计算公式： (L / tan(x1)) - (L / tan(x2))</p>
+
+  <label for="L">L：</label>
+  <input type="number" id="L" step="any">
+
+  <label for="x1">x1 (角度)：</label>
+  <input type="number" id="x1" step="any">
+
+  <label for="x2">x2 (角度)：</label>
+  <input type="number" id="x2" step="any">
+
+  <button onclick="calculate()">计算</button>
+
+  <div id="result"></div>
+
+  <script>
+    function calculate() {
+      let L = parseFloat(document.getElementById("L").value);
+      let x1 = parseFloat(document.getElementById("x1").value);
+      let x2 = parseFloat(document.getElementById("x2").value);
+
+      if (isNaN(L) || isNaN(x1) || isNaN(x2)) {
+        document.getElementById("result").innerText = "请输入所有数值！";
+        return;
+      }
+
+      // 角度转弧度
+      let rad1 = x1 * Math.PI / 180;
+      let rad2 = x2 * Math.PI / 180;
+
+      let result = (L / Math.tan(rad1)) - (L / Math.tan(rad2));
+
+      document.getElementById("result").innerText = "计算结果: " + result.toFixed(6);
+    }
+  </script>
+</body>
+</html>

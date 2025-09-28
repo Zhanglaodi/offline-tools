@@ -1,0 +1,567 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>BCC异或校验工具</title>
+    <style>
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
+            -webkit-tap-highlight-color: transparent;
+        }
+        
+        body {
+            background: linear-gradient(135deg, #1a2a6c, #b21f1f, #fdbb2d);
+            color: #333;
+            min-height: 100vh;
+            padding: 10px;
+            line-height: 1.5;
+        }
+        
+        .container {
+            max-width: 100%;
+            margin: 0 auto;
+            background-color: rgba(255, 255, 255, 0.98);
+            border-radius: 12px;
+            box-shadow: 0 5px 20px rgba(0, 0, 0, 0.15);
+            overflow: hidden;
+        }
+        
+        header {
+            background: linear-gradient(90deg, #2c3e50, #4a6491);
+            color: white;
+            padding: 15px 10px;
+            text-align: center;
+        }
+        
+        h1 {
+            font-size: 1.8rem;
+            margin-bottom: 8px;
+            font-weight: 600;
+        }
+        
+        .subtitle {
+            font-size: 0.9rem;
+            opacity: 0.9;
+            padding: 0 10px;
+        }
+        
+        .main-content {
+            display: flex;
+            flex-direction: column;
+            padding: 15px;
+        }
+        
+        .config-panel, .input-panel {
+            width: 100%;
+            padding: 15px;
+            background-color: #f8f9fa;
+            border-radius: 10px;
+            margin-bottom: 15px;
+        }
+        
+        .section-title {
+            font-size: 1.3rem;
+            margin-bottom: 12px;
+            color: #2c3e50;
+            border-bottom: 2px solid #3498db;
+            padding-bottom: 6px;
+            font-weight: 600;
+        }
+        
+        .form-group {
+            margin-bottom: 12px;
+        }
+        
+        label {
+            display: block;
+            margin-bottom: 5px;
+            font-weight: 600;
+            color: #34495e;
+            font-size: 0.95rem;
+        }
+        
+        select, input, textarea {
+            width: 100%;
+            padding: 12px;
+            border: 1px solid #ddd;
+            border-radius: 6px;
+            font-size: 1rem;
+            -webkit-appearance: none;
+            appearance: none;
+        }
+        
+        select {
+            background-image: url("data:image/svg+xml;charset=UTF-8,%3csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%23333' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3e%3cpolyline points='6 9 12 15 18 9'%3e%3c/polyline%3e%3c/svg%3e");
+            background-repeat: no-repeat;
+            background-position: right 12px center;
+            background-size: 16px;
+            padding-right: 40px;
+        }
+        
+        textarea {
+            height: 120px;
+            resize: vertical;
+            font-family: monospace;
+            min-height: 100px;
+        }
+        
+        .checkbox-group {
+            display: flex;
+            align-items: center;
+            margin-bottom: 10px;
+            padding: 8px 0;
+        }
+        
+        .checkbox-group input {
+            width: 22px;
+            height: 22px;
+            margin-right: 10px;
+            flex-shrink: 0;
+        }
+        
+        .checkbox-group label {
+            margin-bottom: 0;
+        }
+        
+        .btn {
+            background: linear-gradient(90deg, #3498db, #2980b9);
+            color: white;
+            border: none;
+            padding: 14px 20px;
+            border-radius: 6px;
+            cursor: pointer;
+            font-size: 1.1rem;
+            font-weight: 600;
+            transition: all 0.3s;
+            display: block;
+            text-align: center;
+            width: 100%;
+            margin-top: 10px;
+            touch-action: manipulation;
+        }
+        
+        .btn:active {
+            background: linear-gradient(90deg, #2980b9, #2573a7);
+            transform: translateY(1px);
+        }
+        
+        .result-box {
+            margin-top: 15px;
+            padding: 12px;
+            background-color: #e8f4fc;
+            border-radius: 6px;
+            border-left: 4px solid #3498db;
+        }
+        
+        .result-title {
+            font-weight: 600;
+            margin-bottom: 8px;
+            color: #2c3e50;
+            font-size: 1rem;
+        }
+        
+        .result-value {
+            font-family: monospace;
+            font-size: 1.1rem;
+            background-color: #2c3e50;
+            color: #fff;
+            padding: 10px;
+            border-radius: 5px;
+            word-break: break-all;
+            overflow-wrap: break-word;
+            line-height: 1.4;
+        }
+        
+        .bcc-info {
+            margin-top: 15px;
+            padding: 12px;
+            background-color: #fff8e1;
+            border-radius: 6px;
+            font-size: 0.85rem;
+            border-left: 4px solid #f39c12;
+        }
+        
+        .hex-display {
+            font-family: monospace;
+            background-color: #f5f5f5;
+            padding: 8px;
+            border-radius: 4px;
+            margin-top: 5px;
+            font-size: 0.9rem;
+            word-break: break-all;
+            overflow-wrap: break-word;
+            line-height: 1.4;
+        }
+        
+        .example-buttons {
+            display: flex;
+            gap: 10px;
+            margin-top: 10px;
+            flex-wrap: wrap;
+        }
+        
+        .example-btn {
+            background: #e0e0e0;
+            border: none;
+            padding: 8px 12px;
+            border-radius: 4px;
+            font-size: 0.85rem;
+            cursor: pointer;
+            flex: 1;
+            min-width: 120px;
+        }
+        
+        .example-btn:active {
+            background: #d0d0d0;
+        }
+        
+        /* 平板和桌面布局 */
+        @media (min-width: 768px) {
+            body {
+                padding: 20px;
+            }
+            
+            .main-content {
+                flex-direction: row;
+            }
+            
+            .config-panel {
+                flex: 1;
+                margin-right: 15px;
+                margin-bottom: 0;
+            }
+            
+            .input-panel {
+                flex: 2;
+                margin-bottom: 0;
+            }
+            
+            h1 {
+                font-size: 2.2rem;
+            }
+            
+            .subtitle {
+                font-size: 1rem;
+            }
+        }
+        
+        /* 小屏幕手机优化 */
+        @media (max-width: 360px) {
+            h1 {
+                font-size: 1.6rem;
+            }
+            
+            .section-title {
+                font-size: 1.2rem;
+            }
+            
+            select, input, textarea {
+                padding: 10px;
+                font-size: 0.95rem;
+            }
+            
+            .btn {
+                padding: 12px 15px;
+                font-size: 1rem;
+            }
+            
+            .example-buttons {
+                flex-direction: column;
+            }
+        }
+        
+        /* 防止iOS缩放 */
+        @media screen and (-webkit-min-device-pixel-ratio:0) {
+            select,
+            textarea,
+            input {
+                font-size: 16px !important;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <header>
+            <h1>BCC异或校验工具</h1>
+            <p class="subtitle">支持文本和十六进制输入 | 实时计算BCC校验值</p>
+        </header>
+        
+        <div class="main-content">
+            <div class="config-panel">
+                <h2 class="section-title">BCC参数配置</h2>
+                
+                <div class="form-group">
+                    <label for="input-type">输入类型:</label>
+                    <select id="input-type">
+                        <option value="text">文本</option>
+                        <option value="hex">十六进制</option>
+                    </select>
+                </div>
+                
+                <div class="form-group">
+                    <label for="initial-value">初始值 (十六进制):</label>
+                    <input type="text" id="initial-value" value="00" placeholder="例如: 00, FF">
+                </div>
+                
+                <div class="checkbox-group">
+                    <input type="checkbox" id="include-length" checked>
+                    <label for="include-length">包含数据长度</label>
+                </div>
+                
+                <div class="checkbox-group">
+                    <input type="checkbox" id="reverse-result">
+                    <label for="reverse-result">结果取反</label>
+                </div>
+                
+                <button id="calculate-btn" class="btn">计算BCC校验值</button>
+                
+                <div class="bcc-info">
+                    <p><strong>BCC校验说明:</strong></p>
+                    <p>BCC(Block Check Character)是异或校验，通过对数据块中所有字节进行异或运算得到校验值。</p>
+                    <p>计算公式: BCC = byte1 XOR byte2 XOR ... XOR byteN</p>
+                </div>
+                
+                <div class="example-buttons">
+                    <button class="example-btn" data-example="simple">简单示例</button>
+                    <button class="example-btn" data-example="modbus">MODBUS示例</button>
+                    <button class="example-btn" data-example="zeros">00 00 测试</button>
+                    <button class="example-btn" data-example="clear">清空数据</button>
+                </div>
+            </div>
+            
+            <div class="input-panel">
+                <h2 class="section-title">输入数据</h2>
+                
+                <div class="form-group">
+                    <label for="input-data">输入数据:</label>
+                    <textarea id="input-data" placeholder="在此输入要计算BCC的数据...">Hello BCC!</textarea>
+                </div>
+                
+                <div class="form-group">
+                    <label>十六进制表示:</label>
+                    <div class="hex-display" id="hex-representation">48656C6C6F2042434321</div>
+                </div>
+                
+                <h2 class="section-title">计算结果</h2>
+                
+                <div class="result-box">
+                    <div class="result-title">BCC校验值 (十六进制):</div>
+                    <div class="result-value" id="bcc-result">等待计算...</div>
+                </div>
+                
+                <div class="result-box">
+                    <div class="result-title">BCC校验值 (十进制):</div>
+                    <div class="result-value" id="decimal-result">等待计算...</div>
+                </div>
+                
+                <div class="result-box">
+                    <div class="result-title">完整数据帧 (包含BCC):</div>
+                    <div class="result-value" id="full-frame">等待计算...</div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // DOM元素
+        const inputTypeSelect = document.getElementById('input-type');
+        const initialValueInput = document.getElementById('initial-value');
+        const includeLengthCheckbox = document.getElementById('include-length');
+        const reverseResultCheckbox = document.getElementById('reverse-result');
+        const inputDataTextarea = document.getElementById('input-data');
+        const hexRepresentationDiv = document.getElementById('hex-representation');
+        const bccResultDiv = document.getElementById('bcc-result');
+        const decimalResultDiv = document.getElementById('decimal-result');
+        const fullFrameDiv = document.getElementById('full-frame');
+        const calculateButton = document.getElementById('calculate-btn');
+        const exampleButtons = document.querySelectorAll('.example-btn');
+
+        // 示例数据
+        const examples = {
+            simple: {
+                inputType: 'text',
+                data: 'Hello BCC!',
+                initialValue: '00',
+                includeLength: true,
+                reverseResult: false
+            },
+            modbus: {
+                inputType: 'hex',
+                data: '010300000002',
+                initialValue: '00',
+                includeLength: false,
+                reverseResult: false
+            },
+            zeros: {
+                inputType: 'hex',
+                data: '00 00',
+                initialValue: '00',
+                includeLength: false,
+                reverseResult: false
+            },
+            clear: {
+                inputType: 'text',
+                data: '',
+                initialValue: '00',
+                includeLength: true,
+                reverseResult: false
+            }
+        };
+
+        // 更新十六进制表示
+        function updateHexRepresentation() {
+            const inputType = inputTypeSelect.value;
+            const inputData = inputDataTextarea.value;
+            
+            if (inputType === 'text') {
+                let hex = '';
+                for (let i = 0; i < inputData.length; i++) {
+                    const hexChar = inputData.charCodeAt(i).toString(16).toUpperCase();
+                    hex += (hexChar.length === 1 ? '0' + hexChar : hexChar) + ' ';
+                }
+                hexRepresentationDiv.textContent = hex.trim();
+            } else {
+                // 对于十六进制输入，只保留有效的十六进制字符
+                const cleanHex = inputData.replace(/[^0-9A-Fa-f]/g, '').toUpperCase();
+                let formattedHex = '';
+                for (let i = 0; i < cleanHex.length; i += 2) {
+                    formattedHex += cleanHex.substr(i, 2) + ' ';
+                }
+                hexRepresentationDiv.textContent = formattedHex.trim();
+            }
+        }
+
+        // 处理十六进制输入（修复空格处理问题）
+        function parseHexInput(hexString) {
+            // 移除所有空格和其他分隔符
+            const cleanHex = hexString.replace(/[^0-9A-Fa-f]/g, '').toUpperCase();
+            
+            // 检查长度是否为偶数
+            if (cleanHex.length % 2 !== 0 && cleanHex.length > 0) {
+                throw new Error('十六进制数据长度必须是偶数');
+            }
+            
+            // 转换为字节数组
+            const bytes = [];
+            for (let i = 0; i < cleanHex.length; i += 2) {
+                const byteStr = cleanHex.substr(i, 2);
+                bytes.push(parseInt(byteStr, 16));
+            }
+            
+            return bytes;
+        }
+
+        // 计算BCC
+        function calculateBCC() {
+            try {
+                // 获取输入数据
+                const inputType = inputTypeSelect.value;
+                let inputData = inputDataTextarea.value;
+                const initialValue = parseInt(initialValueInput.value, 16) || 0;
+                const includeLength = includeLengthCheckbox.checked;
+                const reverseResult = reverseResultCheckbox.checked;
+                
+                // 将输入数据转换为字节数组
+                let dataBytes = [];
+                if (inputType === 'text') {
+                    for (let i = 0; i < inputData.length; i++) {
+                        dataBytes.push(inputData.charCodeAt(i) & 0xFF);
+                    }
+                } else {
+                    // 使用修复的十六进制解析函数
+                    dataBytes = parseHexInput(inputData);
+                }
+                
+                console.log('解析的字节数组:', dataBytes); // 调试信息
+                
+                // 如果包含数据长度，在数据前添加长度字节
+                if (includeLength && dataBytes.length > 0) {
+                    const lengthByte = dataBytes.length & 0xFF;
+                    dataBytes.unshift(lengthByte);
+                }
+                
+                // 计算BCC（异或校验）
+                let bcc = initialValue;
+                for (let byte of dataBytes) {
+                    bcc ^= byte;
+                }
+                
+                // 如果选择结果取反
+                if (reverseResult) {
+                    bcc = ~bcc & 0xFF;
+                }
+                
+                // 显示结果
+                const hexBcc = bcc.toString(16).toUpperCase().padStart(2, '0');
+                bccResultDiv.textContent = '0x' + hexBcc;
+                decimalResultDiv.textContent = bcc.toString();
+                
+                // 显示完整数据帧
+                let fullFrame = '';
+                if (inputType === 'hex') {
+                    fullFrame = inputData.replace(/[^0-9A-Fa-f]/g, '').toUpperCase();
+                } else {
+                    // 文本输入时显示十六进制格式的完整帧
+                    for (let byte of dataBytes) {
+                        fullFrame += byte.toString(16).toUpperCase().padStart(2, '0');
+                    }
+                }
+                fullFrame += hexBcc;
+                
+                // 格式化显示（每2个字符加空格）
+                let formattedFrame = '';
+                for (let i = 0; i < fullFrame.length; i += 2) {
+                    formattedFrame += fullFrame.substr(i, 2) + ' ';
+                }
+                fullFrameDiv.textContent = formattedFrame.trim();
+                
+            } catch (error) {
+                bccResultDiv.textContent = '错误: ' + error.message;
+                decimalResultDiv.textContent = '计算失败';
+                fullFrameDiv.textContent = '数据格式错误';
+            }
+        }
+
+        // 加载示例数据
+        function loadExample(exampleKey) {
+            const example = examples[exampleKey];
+            if (!example) return;
+            
+            inputTypeSelect.value = example.inputType;
+            inputDataTextarea.value = example.data;
+            initialValueInput.value = example.initialValue;
+            includeLengthCheckbox.checked = example.includeLength;
+            reverseResultCheckbox.checked = example.reverseResult;
+            
+            updateHexRepresentation();
+            calculateBCC();
+        }
+
+        // 事件监听
+        inputTypeSelect.addEventListener('change', updateHexRepresentation);
+        inputDataTextarea.addEventListener('input', updateHexRepresentation);
+        calculateButton.addEventListener('click', calculateBCC);
+        
+        // 示例按钮事件
+        exampleButtons.forEach(button => {
+            button.addEventListener('click', function() {
+                loadExample(this.getAttribute('data-example'));
+            });
+        });
+
+        // 参数变化时自动重新计算
+        initialValueInput.addEventListener('input', calculateBCC);
+        includeLengthCheckbox.addEventListener('change', calculateBCC);
+        reverseResultCheckbox.addEventListener('change', calculateBCC);
+
+        // 初始化
+        updateHexRepresentation();
+        calculateBCC();
+    </script>
+</body>
+</html>
