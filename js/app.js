@@ -10,9 +10,9 @@ const DEFAULT_LINKS = [
     { id: crypto.randomUUID(), title: '创芯曲线工具', url: './tools/创芯科技/index.html', desc: '创新科技曲线工具,只支持csv文件', tags: ['曲线', '创芯', '工具'], kind: 'LOCAL', online: true },
     { id: crypto.randomUUID(), title: '周立功曲线工具', url: './tools/周立功/index.html', desc: '支持解析ASC文件', tags: ['曲线', '周立功', '工具'], kind: 'LOCAL', online: true },
     { id: crypto.randomUUID(), title: '串口工具-网页', url: './tools/serial/index.html', desc: '串口工具-仅供娱乐', tags: ['串口', '工具'], kind: 'LOCAL', online: true },
-	{ id: crypto.randomUUID(), title: '塞弗转向-计算轮距', url: './tools/塞弗转向-计算轮距/index.html', desc: '塞弗转向-计算轮距', tags: ['汽车', '工具'], kind: 'LOCAL', online: true },
-	{ id: crypto.randomUUID(), title: 'CRC-校验', url: './tools/CRC-校验/index.html', desc: '支持自定义多项式，支持多种CRC校验', tags: ['工具', 'CRC校验'], kind: 'LOCAL', online: true },
-	{ id: crypto.randomUUID(), title: 'BCC-校验', url: './tools/BCC校验/index.html', desc: '支持BCC校验', tags: ['工具', 'BCC校验'], kind: 'LOCAL', online: true },
+    { id: crypto.randomUUID(), title: '塞弗转向-计算轮距', url: './tools/塞弗转向-计算轮距/index.html', desc: '塞弗转向-计算轮距', tags: ['汽车', '工具'], kind: 'LOCAL', online: true },
+    { id: crypto.randomUUID(), title: 'CRC-校验', url: './tools/CRC-校验/index.html', desc: '支持自定义多项式，支持多种CRC校验', tags: ['工具', 'CRC校验'], kind: 'LOCAL', online: true },
+    { id: crypto.randomUUID(), title: 'BCC-校验', url: './tools/BCC校验/index.html', desc: '支持BCC校验', tags: ['工具', 'BCC校验'], kind: 'LOCAL', online: true },
     { id: crypto.randomUUID(), title: 'STM32 文档 (F4 HAL)', url: 'https://www.st.com/en/embedded-software/stm32cube-mcu-packages.html', desc: 'F4 HAL 参考与例程入口。', tags: ['STM32', 'HAL', '文档'], kind: 'WEB', online: true }
 ];
 
@@ -116,6 +116,10 @@ function render() {
         window.help = () => console.log('%c命令: pro(), about()', 'color:#f6ad55');
         window.pro = () => console.log('%c专业模式未开放，敬请期待~', 'color:#ed64a6');
         window.about = () => console.log('%cAuthor: xt  |  Build: ' + new Date().toLocaleString(), 'color:#cbd5e0');
+        window.djb = () => {
+            console.log('%c👉 点击这里: https://ncnm4gvv4snr.feishu.cn/drive/folder/P9ZSfBfs4lLhBIdmdyjcKR1gnng',
+                'color:#48bb78;font-weight:bold;text-decoration:underline;');
+        };
     })();
 }
 

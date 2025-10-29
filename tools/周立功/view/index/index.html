@@ -136,8 +136,8 @@
         });
     }, false);
 
-    // 提交
-    function submit() {
+    // 提交 - 优化版本，支持大数据量处理
+    async function submit() {
         // 收集数据（保持你的字段不变）
         let requests_data = {
             curve_name: $('#curve_name').val(),
@@ -161,75 +161,110 @@
             return layer.msg("曲线已存在", { icon: 0, time: 900 });
         }
 
-        // 解析数据：确保返回 [[t,value], ...]
-        let _data = Tools.data_parse(parent_context[requests_data['can_id']], requests_data);
-        _data = (_data || []).slice().sort((a, b) => a[0] - b[0]);  // 按时间升序
+        const sourceData = parent_context[requests_data['can_id']];
+        if (!sourceData || sourceData.length === 0) {
+            return layer.msg("未找到对应CAN ID的数据", { icon: 2, time: 900 });
+        }
 
-        // === 新增：读取周期/容差（UI→perID→默认）并做丢帧检测 ===
-        const { T_ms, tol } = getDropCfgForCurrentID(select_can_id);
-        const drop = detectDropsFixedPeriod(_data, T_ms, tol);
-        const anno = buildDropAnnotations(drop.events, requests_data['curve_name']);
+        // 显示处理进度
+        const loadingIndex = layer.load(1, { shade: [0.3, '#000'] });
+        
+        try {
+            let _data;
+            
+            // 判断数据量大小，选择处理方式
+            if (sourceData.length > 10000) {
+                // 大数据量使用流式处理
+                layer.msg('数据量较大，正在后台处理...', { icon: 16, time: 1000 });
+                
+                _data = await Tools.data_parse_stream(sourceData, requests_data, (progress) => {
+                    // 更新进度（可以在这里添加进度条显示）
+                    console.log(`数据处理进度: ${progress}%`);
+                });
+            } else {
+                // 小数据量使用常规处理
+                _data = Tools.data_parse(sourceData, requests_data);
+            }
+            
+            _data = (_data || []).slice().sort((a, b) => a[0] - b[0]);  // 按时间升序
 
-        // —— 丢帧检测后（你已有 drop 变量）
-        const cid = requests_data['can_id'];
-        const cname = requests_data['curve_name'];
+            // === 新增：读取周期/容差（UI→perID→默认）并做丢帧检测 ===
+            const { T_ms, tol } = getDropCfgForCurrentID(select_can_id);
+            const drop = detectDropsFixedPeriod(_data, T_ms, tol);
+            const anno = buildDropAnnotations(drop.events, requests_data['curve_name']);
 
-        // 确保结构存在
-        export_data[cid] = export_data[cid] || { row: {} };
-        export_data[cid][cname] = export_data[cid][cname] || { requests_data: {} };
+            // —— 丢帧检测后（你已有 drop 变量）
+            const cid = requests_data['can_id'];
+            const cname = requests_data['curve_name'];
 
-        // 保存明细和汇总（CSV 导出要用）
-        export_data[cid][cname].drops = drop.events;        // 每条丢帧事件
-        export_data[cid][cname].drop_summary = drop.summary; // 汇总数据
+            // 确保结构存在
+            export_data[cid] = export_data[cid] || { row: {} };
+            export_data[cid][cname] = export_data[cid][cname] || { requests_data: {} };
 
+            // 保存明细和汇总（CSV 导出要用）
+            export_data[cid][cname].drops = drop.events;        // 每条丢帧事件
+            export_data[cid][cname].drop_summary = drop.summary; // 汇总数据
 
-        // 你的导出数据逻辑（保持不变）
-        !export_data.hasOwnProperty(requests_data['can_id']) && (export_data[requests_data['can_id']] = { 'row': {} });
-        !export_data[requests_data['can_id']].hasOwnProperty(requests_data['curve_name']) &&
-            (export_data[requests_data['can_id']][requests_data['curve_name']] = { 'requests_data': {} });
-        export_data[requests_data['can_id']][requests_data['curve_name']]['requests_data'] = requests_data;
-        export_data[requests_data['can_id']]['row'] = parent_context[requests_data['can_id']];
+            // 你的导出数据逻辑（保持不变）
+            !export_data.hasOwnProperty(requests_data['can_id']) && (export_data[requests_data['can_id']] = { 'row': {} });
+            !export_data[requests_data['can_id']].hasOwnProperty(requests_data['curve_name']) &&
+                (export_data[requests_data['can_id']][requests_data['curve_name']] = { 'requests_data': {} });
+            export_data[requests_data['can_id']][requests_data['curve_name']]['requests_data'] = requests_data;
+            export_data[requests_data['can_id']]['row'] = parent_context[requests_data['can_id']];
 
-        // 合并数据（只在 series 上加了 markLine/markPoint，两行）
-        const newSeries = {
-            name: requests_data['curve_name'],
-            type: 'line',
-            smooth: true,
-            showSymbol: false,
-            clip: true,
-            symbol: 'none',
-            itemStyle: {
-                normal: {
-                    lineStyle: {
-                        // color: 'blue',
-                        width: 1
+            // 合并数据（只在 series 上加了 markLine/markPoint，两行）
+            const newSeries = {
+                name: requests_data['curve_name'],
+                type: 'line',
+                smooth: true,
+                showSymbol: false,
+                clip: true,
+                symbol: 'none',
+                itemStyle: {
+                    normal: {
+                        lineStyle: {
+                            // color: 'blue',
+                            width: 1
+                        }
                     }
-                }
-            },
-            data: _data,
-            // === 新增：丢帧标注 ===
-            markLine: anno.markLine,
-            markPoint: anno.markPoint
-        };
+                },
+                data: _data,
+                // === 新增：丢帧标注 ===
+                markLine: anno.markLine,
+                markPoint: anno.markPoint
+            };
 
-        if (!requests_data['curve_checked']) {
-            curve_data.legend = [requests_data['curve_name']];
-            curve_data.series = [newSeries];
-        } else {
-            curve_data.legend.push(requests_data['curve_name']);
-            curve_data.series.push(newSeries);
+            if (!requests_data['curve_checked']) {
+                curve_data.legend = [requests_data['curve_name']];
+                curve_data.series = [newSeries];
+            } else {
+                curve_data.legend.push(requests_data['curve_name']);
+                curve_data.series.push(newSeries);
+            }
+
+            // 可选：把统计打印到控制台（不改你的UI）
+            if (drop.summary) {
+                const s = drop.summary;
+                console.log(`[${requests_data['curve_name']}] 总帧=${s.N}, 周期=${s.T_ms}ms, 容差=${(s.tol * 100).toFixed(1)}%`
+                    + `, 阈值=${s.thr_ms.toFixed(3)}ms, 丢帧事件=${drop.events.length}, `
+                    + `估计缺帧=${s.totalMissing}, 最严重=${s.worst}, 丢帧率=${s.missRatio.toFixed(3)}%`);
+            }
+
+            // 渲染
+            draw_my_charts(curve_data);
+            
+            // 显示内存使用情况
+            const memory = Tools.getMemoryUsage();
+            if (memory) {
+                console.log('当前内存使用:', memory);
+            }
+            
+        } catch (error) {
+            console.error('数据处理失败:', error);
+            layer.msg('数据处理失败: ' + error.message, { icon: 2, time: 2000 });
+        } finally {
+            layer.close(loadingIndex);
         }
-
-        // 可选：把统计打印到控制台（不改你的UI）
-        if (drop.summary) {
-            const s = drop.summary;
-            console.log(`[${requests_data['curve_name']}] 总帧=${s.N}, 周期=${s.T_ms}ms, 容差=${(s.tol * 100).toFixed(1)}%`
-                + `, 阈值=${s.thr_ms.toFixed(3)}ms, 丢帧事件=${drop.events.length}, `
-                + `估计缺帧=${s.totalMissing}, 最严重=${s.worst}, 丢帧率=${s.missRatio.toFixed(3)}%`);
-        }
-
-        // 渲染
-        draw_my_charts(curve_data);
     }
     // 显示模式：'stacked' = 上下分图（子图模式，有高度上限），'multiAxis' = 同图多Y轴
     let DISPLAY_MODE = 'stacked';

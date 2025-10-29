@@ -19,6 +19,25 @@
                 src="./static/icon/upload.png" style="height: 30px">
             <span id="btn-upload-file-name">上传文件</span>
         </button>
+        
+        <!-- 添加进度条和内存监控 -->
+        <div id="progress-container" style="margin-top: 10px; display: none;">
+            <div class="progress" style="height: 20px;">
+                <div id="progress-bar" class="progress-bar progress-bar-striped progress-bar-animated" 
+                     role="progressbar" style="width: 0%" aria-valuenow="0" aria-valuemin="0" aria-valuemax="100">
+                    0%
+                </div>
+            </div>
+            <div style="margin-top: 5px;">
+                <small id="memory-info" class="text-muted"></small>
+                <button type="button" class="btn btn-sm btn-outline-secondary ms-2" onclick="showMemoryDetails()">
+                    内存详情
+                </button>
+                <button type="button" class="btn btn-sm btn-outline-warning ms-1" onclick="forceCleanMemory()">
+                    清理内存
+                </button>
+            </div>
+        </div>
     </div>
 </div>
 <hr>
@@ -56,10 +75,318 @@
 <!-- 包含 Popper 的 Bootstrap 集成包 -->
 <script src="./lib/bootstrap/bootstrap.bundle.min.js"></script>
 <script>
-    // 通用文件内容
+    // 全局变量 - 优化内存管理
     let file_context = {};
-    // CAN ID
-    let can_id = [];
+    let can_id = new Set(); // 使用Set避免重复
+    let dataWorker = null;
+    let chunkDataBuffer = []; // 临时缓冲区
+    let processedDataCount = 0; // 已处理数据计数
+
+    // 内存管理配置
+    const MEMORY_CONFIG = {
+        MAX_CHUNK_BUFFER: 5,        // 最大缓冲区块数
+        CHUNK_SIZE: 2 * 1024 * 1024, // 减小到2MB
+        FORCE_GC_INTERVAL: 10,       // 每10块强制垃圾回收
+        MAX_MEMORY_USAGE: 0.7        // 最大内存使用率70%
+    };
+
+    // 初始化Web Worker
+    function initWorker() {
+        if (typeof Worker !== 'undefined' && !dataWorker) {
+            try {
+                dataWorker = new Worker('./js/dataWorker.js');
+                dataWorker.onmessage = handleWorkerMessage;
+                dataWorker.onerror = function(error) {
+                    console.error('Worker错误:', error);
+                    dataWorker = null;
+                };
+            } catch (error) {
+                console.warn('无法创建Web Worker:', error.message);
+                dataWorker = null;
+            }
+        }
+    }
+
+    // 检查内存使用率
+    function checkMemoryUsage() {
+        if (performance.memory) {
+            const used = performance.memory.usedJSHeapSize;
+            const limit = performance.memory.jsHeapSizeLimit;
+            const usage = used / limit;
+            
+            if (usage > MEMORY_CONFIG.MAX_MEMORY_USAGE) {
+                console.warn(`内存使用率过高: ${(usage * 100).toFixed(1)}%`);
+                // 强制垃圾回收
+                if (window.gc) {
+                    window.gc();
+                }
+                return true; // 需要清理
+            }
+        }
+        return false;
+    }
+
+    // 处理Worker消息
+    function handleWorkerMessage(e) {
+        const { type, data } = e.data;
+        
+        switch (type) {
+            case 'CHUNK_PROCESSED':
+                handleChunkProcessed(data);
+                break;
+            case 'PROGRESS':
+                updateProgress(data.progress, '后台处理中...');
+                break;
+            case 'ERROR':
+                console.error('Worker处理错误:', data.error);
+                layer.msg('数据处理出错: ' + data.error);
+                break;
+        }
+    }
+
+    // 处理已处理的块 - 优化内存管理
+    function handleChunkProcessed(data) {
+        const { chunkIndex, file_context: chunkContext, can_id: chunkCanIds } = data;
+        
+        // 立即合并数据到主存储
+        Object.keys(chunkContext).forEach(canId => {
+            if (!file_context[canId]) {
+                file_context[canId] = [];
+            }
+            // 分批合并，避免大数组操作
+            const chunkData = chunkContext[canId];
+            if (chunkData.length > 1000) {
+                // 大数据分批添加
+                for (let i = 0; i < chunkData.length; i += 500) {
+                    const batch = chunkData.slice(i, i + 500);
+                    file_context[canId].push(...batch);
+                }
+            } else {
+                file_context[canId].push(...chunkData);
+            }
+        });
+        
+        // 添加CAN ID到Set（自动去重）
+        chunkCanIds.forEach(id => can_id.add(id));
+        
+        // 清理Worker数据引用
+        chunkContext = null;
+        
+        processedDataCount++;
+        
+        // 定期内存检查和清理
+        if (processedDataCount % MEMORY_CONFIG.FORCE_GC_INTERVAL === 0) {
+            if (checkMemoryUsage() && window.gc) {
+                window.gc();
+                console.log('执行了垃圾回收');
+            }
+        }
+    }
+
+    // 处理大文件（内存优化版本）
+    async function processLargeFileWithWorker(file) {
+        const CHUNK_SIZE = MEMORY_CONFIG.CHUNK_SIZE;
+        const totalChunks = Math.ceil(file.size / CHUNK_SIZE);
+        
+        showProgress();
+        updateProgress(0, `开始处理大文件: ${file.name} (${(file.size / 1024 / 1024).toFixed(1)}MB)`);
+        
+        try {
+            // 先读取前3行判断版本
+            const header = await readFileChunk(file, 0, 1024, 'gbk');
+            const headerLines = header.split('\n');
+            const isVersion7 = headerLines.length > 2 && headerLines[2].endsWith('7.0.0\r');
+            
+            // 重置数据结构
+            file_context = {};
+            can_id = new Set();
+            processedDataCount = 0;
+            let first_time = null;
+            let leftover = '';
+            
+            // 确保can_id是Set类型
+            if (!(can_id instanceof Set)) {
+                console.warn('重新初始化can_id为Set');
+                can_id = new Set();
+            }
+            
+            // 串行处理而非并行，减少内存压力
+            for (let i = 0; i < totalChunks; i++) {
+                const start = i * CHUNK_SIZE;
+                const end = Math.min(start + CHUNK_SIZE, file.size);
+                
+                // 更新进度
+                const progress = Math.round((i / totalChunks) * 100);
+                updateProgress(progress, `处理数据块 ${i + 1}/${totalChunks}`);
+                updateMemoryInfo();
+                
+                // 内存检查，如果使用率过高则暂停
+                if (checkMemoryUsage()) {
+                    await new Promise(resolve => setTimeout(resolve, 100));
+                    if (window.gc) window.gc();
+                }
+                
+                // 处理当前块
+                try {
+                    await processChunkAsync(file, start, end - start, i, isVersion7, first_time, leftover);
+                } catch (chunkError) {
+                    console.warn(`处理第${i+1}块时出错:`, chunkError.message);
+                    // 继续处理下一块，而不是完全失败
+                }
+                
+                // 每处理几个块就让出控制权
+                if (i % 5 === 0) {
+                    await new Promise(resolve => setTimeout(resolve, 20));
+                }
+            }
+            
+            updateProgress(100, '数据处理完成，准备发送...');
+            
+            // 转换Set为数组，发送给子页面
+            const canIdArray = Array.from(can_id);
+            document.getElementById('index').contentWindow
+                .postMessage({file_context, can_id: canIdArray}, '*');
+            
+            updateProgress(100, `文件处理完成: ${canIdArray.length} 个CAN ID`);
+            setTimeout(hideProgress, 2000);
+            
+        } catch (error) {
+            console.error('文件处理错误:', error);
+            layer.msg('文件处理失败: ' + error.message);
+            updateProgress(0, '处理失败');
+            setTimeout(hideProgress, 2000);
+        }
+    }
+
+    // 处理大文件（主线程版本，内存优化）
+    async function processLargeFile(file) {
+        const CHUNK_SIZE = MEMORY_CONFIG.CHUNK_SIZE;
+        const totalChunks = Math.ceil(file.size / CHUNK_SIZE);
+        
+        showProgress();
+        updateProgress(0, `开始处理大文件: ${file.name} (${(file.size / 1024 / 1024).toFixed(1)}MB)`);
+        
+        try {
+            // 先读取前3行判断版本
+            const header = await readFileChunk(file, 0, 1024, 'gbk');
+            const headerLines = header.split('\n');
+            const isVersion7 = headerLines.length > 2 && headerLines[2].endsWith('7.0.0\r');
+            
+            // 重置数据结构
+            file_context = {};
+            can_id = new Set();
+            let first_time = null;
+            let leftover = '';
+            
+            // 确保can_id是Set类型（调试用）
+            if (!(can_id instanceof Set)) {
+                console.warn('processLargeFile: 重新初始化can_id为Set');
+                can_id = new Set();
+            }
+            
+            // 串行处理所有块
+            for (let i = 0; i < totalChunks; i++) {
+                const start = i * CHUNK_SIZE;
+                const end = Math.min(start + CHUNK_SIZE, file.size);
+                
+                // 更新进度
+                const progress = Math.round((i / totalChunks) * 100);
+                updateProgress(progress, `处理数据块 ${i + 1}/${totalChunks}`);
+                updateMemoryInfo();
+                
+                // 读取块
+                const chunk = await readFileChunk(file, start, end - start, 'gbk');
+                const lines = (leftover + chunk).split('\n');
+                
+                // 保留最后一行作为下一块的开始
+                leftover = lines.pop() || '';
+                
+                // 处理当前块的行
+                if (isVersion7) {
+                    first_time = processChunkVersion7(lines, first_time, i === 0);
+                } else {
+                    first_time = processChunkVersionOld(lines, first_time, i === 0);
+                }
+                
+                // 内存管理
+                if (i % MEMORY_CONFIG.FORCE_GC_INTERVAL === 0) {
+                    if (checkMemoryUsage() && window.gc) {
+                        window.gc();
+                    }
+                    // 让出控制权
+                    await new Promise(resolve => setTimeout(resolve, 20));
+                }
+            }
+            
+            // 处理最后的剩余内容
+            if (leftover.trim()) {
+                const finalLines = [leftover];
+                if (isVersion7) {
+                    processChunkVersion7(finalLines, first_time, false);
+                } else {
+                    processChunkVersionOld(finalLines, first_time, false);
+                }
+            }
+            
+            updateProgress(100, '数据处理完成，准备发送...');
+            
+            const canIdArray = Array.from(can_id);
+            document.getElementById('index').contentWindow
+                .postMessage({file_context, can_id: canIdArray}, '*');
+            
+            updateProgress(100, `文件处理完成: ${canIdArray.length} 个CAN ID`);
+            setTimeout(hideProgress, 2000);
+            
+        } catch (error) {
+            console.error('文件处理错误:', error);
+            layer.msg('文件处理失败: ' + error.message);
+            updateProgress(0, '处理失败');
+            setTimeout(hideProgress, 2000);
+        }
+    }
+
+    // 异步处理单个块
+    async function processChunkAsync(file, start, size, chunkIndex, isVersion7, first_time, leftover) {
+        const chunk = await readFileChunk(file, start, size, 'gbk');
+        const lines = (leftover + chunk).split('\n');
+        
+        // 保留最后一行作为下一块的开始
+        leftover = lines.pop() || '';
+        
+        if (dataWorker) {
+            // 使用Worker处理
+            return new Promise((resolve) => {
+                const handleMessage = (e) => {
+                    if (e.data.type === 'CHUNK_PROCESSED' && e.data.data.chunkIndex === chunkIndex) {
+                        dataWorker.removeEventListener('message', handleMessage);
+                        handleChunkProcessed(e.data.data);
+                        resolve(e.data.data);
+                    }
+                };
+                dataWorker.addEventListener('message', handleMessage);
+                dataWorker.postMessage({
+                    type: 'PARSE_FILE_CHUNK',
+                    data: {
+                        chunk: lines.join('\n'),
+                        isVersion7,
+                        first_time,
+                        chunkIndex
+                    }
+                });
+            });
+        } else {
+            // 主线程处理
+            if (isVersion7) {
+                const result = processChunkVersion7(lines, first_time, chunkIndex === 0);
+                handleChunkProcessed({ chunkIndex, ...result });
+                return result;
+            } else {
+                const result = processChunkVersionOld(lines, first_time, chunkIndex === 0);
+                handleChunkProcessed({ chunkIndex, ...result });
+                return result;
+            }
+        }
+    }
 
     // 7.0.0 版本 —— 以第一条记录为零点，保留 6 位小数
     function version_7_0_0(_file_context) {
@@ -73,8 +400,8 @@
                 }
             }
         }
-        file_context = [];
-        can_id = [];
+        file_context = {};
+        can_id = new Set();
 
         let first_time = null; // 记录首个绝对时间
 
@@ -86,7 +413,7 @@
                     }
                     const t_rel = (parseFloat(row[0]) - first_time).toFixed(6);
 
-                    can_id.push(row[2]);
+                    can_id.add(row[2]);
                     file_context[row[2]] = file_context[row[2]] || [];
                     file_context[row[2]].push({
                         'can_id': row[2],
@@ -96,7 +423,7 @@
                 }
             }
         }
-        return [can_id, file_context];
+        return [Array.from(can_id), file_context];
     }
 
     // 版本找不到 —— 已有归零逻辑，这里统一保留 6 位小数
@@ -112,8 +439,8 @@
             }
         }
 
-        file_context = [];
-        can_id = [];
+        file_context = {};
+        can_id = new Set();
         let can_id_list, _can_id, first_time = -1;
         for (let row of _file_context) {
             if (row.length > 5 && (row = row.split(' '))) {
@@ -125,7 +452,8 @@
 
                 can_id_list = row[1].split('\t');
                 _can_id = can_id_list[0];
-                if (row.length > 5 && can_id.push(_can_id)) {
+                if (row.length > 5) {
+                    can_id.add(_can_id);
                     file_context[_can_id] = file_context[_can_id] || [];
                     file_context[_can_id].push({
                         'can_id': _can_id,
@@ -135,17 +463,59 @@
                 }
             }
         }
-        return [can_id, file_context];
+        return [Array.from(can_id), file_context];
     }
-	// === 原来就有的，别删 ===
+	// === 优化后的分片读取版本 - 严格内存控制 ===
     function get_file_context(obj) {
         let file = obj.files[0];
         let file_type = file.name.split('.');
         if (file_type[file_type.length - 1] !== 'asc') {
             return layer.msg('非法文件类型');
         }
-        $('#btn-upload-file-name').html(file.name + ' 上传中...')
+        
+        // 检查可用内存
+        if (performance.memory) {
+            const available = performance.memory.jsHeapSizeLimit - performance.memory.usedJSHeapSize;
+            const availableMB = available / (1024 * 1024);
+            console.log(`可用内存: ${availableMB.toFixed(1)}MB`);
+            
+            // 如果可用内存不足文件大小的1.5倍，发出警告
+            const fileMB = file.size / (1024 * 1024);
+            if (availableMB < fileMB * 1.5) {
+                const confirmMsg = `警告：文件大小${fileMB.toFixed(1)}MB，可用内存${availableMB.toFixed(1)}MB可能不足。\n建议关闭其他标签页或使用更小的文件。\n确定继续吗？`;
+                if (!confirm(confirmMsg)) {
+                    return;
+                }
+            }
+        }
+        
+        // 初始化Worker
+        initWorker();
+        
+        // 更严格的大文件检测
+        const SMALL_FILE_LIMIT = 20 * 1024 * 1024; // 20MB
+        const LARGE_FILE_LIMIT = 100 * 1024 * 1024; // 100MB
+        
+        if (file.size > LARGE_FILE_LIMIT) {
+            layer.msg('文件过大，建议分割后处理', { icon: 0, time: 3000 });
+            return;
+        } else if (file.size > SMALL_FILE_LIMIT) {
+            if (dataWorker) {
+                processLargeFileWithWorker(file);
+            } else {
+                processLargeFile(file);
+            }
+        } else {
+            processSmallFile(file);
+        }
+        
+        $('#upload_file').val('');
+    }
 
+    // 处理小文件（原逻辑）
+    function processSmallFile(file) {
+        $('#btn-upload-file-name').html(file.name + ' 上传中...')
+        
         let reader = new FileReader();
         reader.readAsText(file, 'gbk');
         reader.onload = () => {
@@ -163,8 +533,253 @@
                 .postMessage({file_context, can_id: [...can_id]}, '*');
             $('#btn-upload-file-name').html(file.name + ' 上传完成');
         };
-        $('#upload_file').val('');
     }
+
+    // 处理大文件（分片读取）
+    async function processLargeFile(file) {
+        const CHUNK_SIZE = 5 * 1024 * 1024; // 5MB每片
+        const totalChunks = Math.ceil(file.size / CHUNK_SIZE);
+        
+        // 显示进度条
+        showProgress();
+        updateProgress(0, `开始处理大文件: ${file.name} (${(file.size / 1024 / 1024).toFixed(1)}MB)`);
+        
+        try {
+            // 先读取前3行判断版本
+            const header = await readFileChunk(file, 0, 1024, 'gbk');
+            const headerLines = header.split('\n');
+            const isVersion7 = headerLines.length > 2 && headerLines[2].endsWith('7.0.0\r');
+            
+            // 重置数据结构
+            file_context = {};
+            can_id = new Set();
+            let first_time = null;
+            let leftover = '';
+            
+            // 串行处理所有块
+            for (let i = 0; i < totalChunks; i++) {
+                const start = i * CHUNK_SIZE;
+                const end = Math.min(start + CHUNK_SIZE, file.size);
+                
+                // 更新进度
+                const progress = Math.round((i / totalChunks) * 100);
+                updateProgress(progress, `处理数据块 ${i + 1}/${totalChunks}`);
+                updateMemoryInfo();
+                
+                // 读取块
+                const chunk = await readFileChunk(file, start, end - start, 'gbk');
+                const lines = (leftover + chunk).split('\n');
+                
+                // 保留最后一行作为下一块的开始（防止行被截断）
+                leftover = lines.pop() || '';
+                
+                // 处理当前块的行
+                if (isVersion7) {
+                    first_time = processChunkVersion7(lines, first_time, i === 0);
+                } else {
+                    first_time = processChunkVersionOld(lines, first_time, i === 0);
+                }
+                
+                // 让出控制权，避免阻塞UI
+                await new Promise(resolve => setTimeout(resolve, 10));
+            }
+            
+            // 处理最后的剩余内容
+            if (leftover.trim()) {
+                const finalLines = [leftover];
+                if (isVersion7) {
+                    processChunkVersion7(finalLines, first_time, false);
+                } else {
+                    processChunkVersionOld(finalLines, first_time, false);
+                }
+            }
+            
+            updateProgress(100, '数据处理完成，准备发送...');
+            
+            const canIdArray = Array.from(can_id);
+            document.getElementById('index').contentWindow
+                .postMessage({file_context, can_id: canIdArray}, '*');
+            
+            updateProgress(100, `文件处理完成: ${Object.keys(file_context).length} 个CAN ID`);
+            setTimeout(hideProgress, 2000);
+            
+        } catch (error) {
+            console.error('文件处理错误:', error);
+            layer.msg('文件处理失败: ' + error.message);
+            updateProgress(0, '处理失败');
+            setTimeout(hideProgress, 2000);
+        }
+    }
+
+    // 进度控制函数
+    function showProgress() {
+        document.getElementById('progress-container').style.display = 'block';
+        updateMemoryInfo();
+    }
+
+    function hideProgress() {
+        document.getElementById('progress-container').style.display = 'none';
+        $('#btn-upload-file-name').html('上传文件');
+    }
+
+    function updateProgress(percent, message) {
+        const progressBar = document.getElementById('progress-bar');
+        progressBar.style.width = percent + '%';
+        progressBar.setAttribute('aria-valuenow', percent);
+        progressBar.textContent = percent + '%';
+        
+        if (message) {
+            $('#btn-upload-file-name').html(message);
+        }
+    }
+
+    function updateMemoryInfo() {
+        const memoryElement = document.getElementById('memory-info');
+        if (performance.memory) {
+            const used = Math.round(performance.memory.usedJSHeapSize / 1024 / 1024);
+            const total = Math.round(performance.memory.totalJSHeapSize / 1024 / 1024);
+            const limit = Math.round(performance.memory.jsHeapSizeLimit / 1024 / 1024);
+            const usagePercent = (used / limit * 100).toFixed(1);
+            
+            memoryElement.textContent = `内存使用: ${used}MB / ${limit}MB (${usagePercent}%)`;
+            
+            // 根据内存使用率显示不同颜色
+            if (used / limit > 0.8) {
+                memoryElement.className = 'text-danger';
+                console.warn('内存使用率过高:', usagePercent + '%');
+            } else if (used / limit > 0.6) {
+                memoryElement.className = 'text-warning';
+            } else {
+                memoryElement.className = 'text-success';
+            }
+            
+            // 如果内存使用率过高，尝试垃圾回收
+            if (used / limit > 0.85 && window.gc) {
+                console.log('内存使用率过高，执行垃圾回收');
+                window.gc();
+            }
+        } else {
+            memoryElement.textContent = '无法获取内存信息（需要Chrome浏览器）';
+            memoryElement.className = 'text-muted';
+        }
+    }
+
+    // 读取文件片段
+    function readFileChunk(file, start, size, encoding = 'gbk') {
+        return new Promise((resolve, reject) => {
+            const chunk = file.slice(start, start + size);
+            const reader = new FileReader();
+            reader.onload = () => resolve(reader.result);
+            reader.onerror = () => reject(reader.error);
+            reader.readAsText(chunk, encoding);
+        });
+    }
+
+    // 处理7.0.0版本的数据块 - 内存优化版
+    function processChunkVersion7(lines, first_time, isFirstChunk) {
+        const skipLines = isFirstChunk ? 3 : 0; // 第一块跳过前3行
+        
+        // 调试：检查can_id类型
+        if (!(can_id instanceof Set)) {
+            console.error('processChunkVersion7: can_id is not a Set!', typeof can_id, can_id);
+            can_id = new Set(); // 紧急修复
+        }
+        
+        for (let i = skipLines; i < lines.length; i++) {
+            const row = lines[i];
+            if (row.length > 5) {
+                const parts = row.split(' ');
+                if (parts.length > 5) {
+                    if (first_time === null) {
+                        first_time = parseFloat(parts[0]);
+                    }
+                    const t_rel = (parseFloat(parts[0]) - first_time).toFixed(6);
+                    const canId = parts[2];
+                    
+                    can_id.add(canId); // 使用Set添加
+                    if (!file_context[canId]) {
+                        file_context[canId] = [];
+                    }
+                    file_context[canId].push({
+                        'can_id': canId,
+                        'time': t_rel,
+                        'data': parts.slice(6, 14)
+                    });
+                }
+            }
+        }
+        return first_time;
+    }
+
+    // 处理旧版本的数据块 - 内存优化版
+    function processChunkVersionOld(lines, first_time, isFirstChunk) {
+        const skipLines = isFirstChunk ? 2 : 0; // 第一块跳过前2行
+        
+        // 调试：检查can_id类型
+        if (!(can_id instanceof Set)) {
+            console.error('processChunkVersionOld: can_id is not a Set!', typeof can_id, can_id);
+            can_id = new Set(); // 紧急修复
+        }
+        
+        for (let i = skipLines; i < lines.length; i++) {
+            const row = lines[i];
+            if (row.length > 5) {
+                const parts = row.split(' ');
+                if (parts.length > 5) {
+                    parts[0] = parts[0].replace('\t1', '');
+                    if (first_time === -1) {
+                        first_time = parseFloat(parts[0]);
+                    }
+                    const t_rel = (parseFloat(parts[0]) - first_time).toFixed(6);
+                    
+                    const can_id_list = parts[1].split('\t');
+                    const _can_id = can_id_list[0];
+                    
+                    can_id.add(_can_id); // 使用Set添加
+                    if (!file_context[_can_id]) {
+                        file_context[_can_id] = [];
+                    }
+                    file_context[_can_id].push({
+                        'can_id': _can_id,
+                        'time': t_rel,
+                        'data': [can_id_list[can_id_list.length - 1], ...parts.slice(2, 9)]
+                    });
+                }
+            }
+        }
+        return first_time;
+    }
+
+    // 显示内存详情
+    function showMemoryDetails() {
+        const memory = Tools.getMemoryUsage();
+        const tips = Tools.getMemoryOptimizationTips();
+        
+        if (memory) {
+            const message = `内存使用详情：\n使用: ${memory.used}\n总计: ${memory.total}\n限制: ${memory.limit}\n使用率: ${memory.usagePercent}\n\n${tips.join('\n')}`;
+            layer.alert(message, { title: '内存状态', icon: memory.isCritical ? 2 : (memory.isHigh ? 0 : 1) });
+        } else {
+            layer.msg('无法获取内存信息', { icon: 0 });
+        }
+    }
+
+    // 强制清理内存
+    function forceCleanMemory() {
+        const cleaned = Tools.forceGarbageCollection();
+        if (cleaned) {
+            layer.msg('已尝试清理内存', { icon: 1, time: 1000 });
+            setTimeout(updateMemoryInfo, 500);
+        } else {
+            layer.msg('浏览器不支持手动内存清理\n建议刷新页面或关闭其他标签页', { icon: 0, time: 2000 });
+        }
+    }
+
+    // 定期更新内存信息
+    setInterval(() => {
+        if (document.getElementById('progress-container').style.display !== 'none') {
+            updateMemoryInfo();
+        }
+    }, 2000);
 </script>
 </body>
 </html>
