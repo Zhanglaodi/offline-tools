@@ -15,6 +15,8 @@ from matplotlib.figure import Figure
 from pathlib import Path
 from collections import defaultdict
 import random
+import statistics
+import numpy as np
 
 # 添加项目路径
 project_root = Path(__file__).parent
@@ -170,6 +172,7 @@ class MultiSignalChartViewer:
         list_btn_frame = ttk.Frame(list_frame)
         list_btn_frame.pack(fill=tk.X, pady=(5, 0))
         ttk.Button(list_btn_frame, text="删除选中", command=self.remove_signal).pack(side=tk.LEFT, padx=(0, 5))
+        ttk.Button(list_btn_frame, text="统计详情", command=self.show_signal_stats).pack(side=tk.LEFT, padx=(0, 5))
         ttk.Button(list_btn_frame, text="更新图表", command=self.update_chart).pack(side=tk.RIGHT)
         
         # 显示选项
@@ -186,6 +189,10 @@ class MultiSignalChartViewer:
         
         self.subplot_mode_var = tk.BooleanVar(value=False)
         ttk.Checkbutton(display_frame, text="子图模式", variable=self.subplot_mode_var,
+                       command=self.update_chart).pack(anchor=tk.W)
+        
+        self.show_dropped_frames_var = tk.BooleanVar(value=True)
+        ttk.Checkbutton(display_frame, text="显示丢帧点", variable=self.show_dropped_frames_var,
                        command=self.update_chart).pack(anchor=tk.W)
         
         # 时间范围控制
@@ -235,6 +242,141 @@ class MultiSignalChartViewer:
         # 状态栏
         self.status_label = ttk.Label(self.root, text="请选择ASC文件并添加信号", relief=tk.SUNKEN)
         self.status_label.pack(side=tk.BOTTOM, fill=tk.X)
+    
+    def calculate_frame_stats(self, can_id):
+        """计算帧统计信息：丢帧和周期"""
+        try:
+            # 过滤指定CAN ID的消息
+            messages = [msg for msg in self.messages if msg['can_id'] == can_id]
+            if len(messages) < 3:
+                return None, None, None
+            
+            # 提取时间戳
+            timestamps = [msg['timestamp'] for msg in messages]
+            timestamps.sort()
+            
+            # 计算时间间隔
+            intervals = []
+            for i in range(1, len(timestamps)):
+                interval = timestamps[i] - timestamps[i-1]
+                intervals.append(interval)
+            
+            if not intervals:
+                return None, None, None
+            
+            # 估算周期（使用中位数，抗干扰）
+            estimated_period = statistics.median(intervals)
+            
+            # 计算平均周期（用于验证）
+            avg_period = statistics.mean(intervals)
+            
+            # 如果中位数和平均值差异太大，使用更稳健的方法
+            if abs(estimated_period - avg_period) > estimated_period * 0.5:
+                # 使用众数区间估算周期
+                # 将间隔分组到毫秒精度
+                interval_bins = {}
+                bin_size = 0.001  # 1ms精度
+                for interval in intervals:
+                    bin_key = round(interval / bin_size) * bin_size
+                    interval_bins[bin_key] = interval_bins.get(bin_key, 0) + 1
+                
+                # 找到最频繁的间隔
+                if interval_bins:
+                    most_common_interval = max(interval_bins.keys(), key=lambda k: interval_bins[k])
+                    estimated_period = most_common_interval
+            
+            # 计算丢帧
+            total_time = timestamps[-1] - timestamps[0]
+            expected_frames = int(total_time / estimated_period) + 1
+            actual_frames = len(messages)
+            dropped_frames = max(0, expected_frames - actual_frames)
+            
+            # 丢帧率
+            drop_rate = (dropped_frames / expected_frames * 100) if expected_frames > 0 else 0
+            
+            return {
+                'period_ms': estimated_period * 1000,  # 转换为毫秒
+                'dropped_frames': dropped_frames,
+                'drop_rate': drop_rate,
+                'total_frames': actual_frames,
+                'expected_frames': expected_frames,
+                'time_span': total_time
+            }
+            
+        except Exception as e:
+            return None
+    
+    def detect_dropped_frame_positions(self, can_id, estimated_period):
+        """检测丢帧位置 - 高效算法"""
+        try:
+            # 获取指定CAN ID的消息
+            messages = [msg for msg in self.messages if msg['can_id'] == can_id]
+            if len(messages) < 2:
+                return []
+            
+            # 排序时间戳
+            timestamps = sorted([msg['timestamp'] for msg in messages])
+            
+            dropped_positions = []
+            tolerance = estimated_period * 0.3  # 30%容差
+            
+            # 检测相邻帧之间的异常间隔
+            for i in range(1, len(timestamps)):
+                interval = timestamps[i] - timestamps[i-1]
+                
+                # 如果间隔明显大于正常周期，说明中间有丢帧
+                if interval > estimated_period + tolerance:
+                    # 计算可能丢失的帧数
+                    dropped_count = round((interval / estimated_period) - 1)
+                    
+                    # 计算丢失帧的时间位置
+                    for j in range(1, dropped_count + 1):
+                        dropped_time = timestamps[i-1] + (j * estimated_period)
+                        # 确保丢失位置在合理范围内
+                        if timestamps[i-1] < dropped_time < timestamps[i]:
+                            dropped_positions.append(dropped_time)
+            
+            return dropped_positions
+            
+        except Exception as e:
+            return []
+    
+    def interpolate_signal_at_dropped_frames(self, timestamps, values, dropped_times):
+        """在丢帧位置插值估算信号值"""
+        interpolated_values = []
+        
+        for drop_time in dropped_times:
+            # 找到最近的两个数据点进行线性插值
+            before_idx = -1
+            after_idx = -1
+            
+            for i, ts in enumerate(timestamps):
+                if ts <= drop_time:
+                    before_idx = i
+                if ts > drop_time and after_idx == -1:
+                    after_idx = i
+                    break
+            
+            # 执行线性插值
+            if before_idx >= 0 and after_idx >= 0:
+                t1, v1 = timestamps[before_idx], values[before_idx]
+                t2, v2 = timestamps[after_idx], values[after_idx]
+                
+                # 线性插值公式
+                ratio = (drop_time - t1) / (t2 - t1) if t2 != t1 else 0
+                interpolated_value = v1 + ratio * (v2 - v1)
+                interpolated_values.append(interpolated_value)
+            elif before_idx >= 0:
+                # 只有前面的点，使用最近值
+                interpolated_values.append(values[before_idx])
+            elif after_idx >= 0:
+                # 只有后面的点，使用最近值
+                interpolated_values.append(values[after_idx])
+            else:
+                # 无法插值，使用0
+                interpolated_values.append(0)
+        
+        return interpolated_values
     
     def load_file(self):
         """加载ASC文件"""
@@ -345,9 +487,18 @@ class MultiSignalChartViewer:
             
             self.signal_configs.append(signal_config)
             
-            # 更新列表显示
+            # 计算帧统计信息
+            frame_stats = self.calculate_frame_stats(can_id)
+            
+            # 更新列表显示（包含丢帧信息）
             endian_text = "大端" if endian == "big" else "小端"
-            display_text = f"{name} | {can_id_str} | {start_bit}-{start_bit+length-1}位 | {endian_text}"
+            if frame_stats:
+                period_text = f"{frame_stats['period_ms']:.1f}ms"
+                drop_text = f"{frame_stats['dropped_frames']}帧({frame_stats['drop_rate']:.1f}%)"
+                display_text = f"{name} | {can_id_str} | {start_bit}-{start_bit+length-1}位 | {endian_text} | 周期:{period_text} | 丢帧:{drop_text}"
+            else:
+                display_text = f"{name} | {can_id_str} | {start_bit}-{start_bit+length-1}位 | {endian_text} | 统计:计算失败"
+            
             self.signal_listbox.insert(tk.END, display_text)
             
             # 自动更新信号名称
@@ -374,6 +525,73 @@ class MultiSignalChartViewer:
         
         self.update_chart()
         self.status_label.config(text="已删除信号")
+    
+    def show_signal_stats(self):
+        """显示选中信号的详细统计信息"""
+        selection = self.signal_listbox.curselection()
+        if not selection:
+            messagebox.showwarning("警告", "请选择要查看统计的信号")
+            return
+        
+        index = selection[0]
+        if index >= len(self.signal_configs):
+            return
+        
+        config = self.signal_configs[index]
+        can_id = config['can_id']
+        
+        # 计算详细统计
+        frame_stats = self.calculate_frame_stats(can_id)
+        if not frame_stats:
+            messagebox.showerror("错误", "无法计算统计信息")
+            return
+        
+        # 创建统计信息窗口
+        stats_window = tk.Toplevel(self.root)
+        stats_window.title(f"信号统计 - {config['name']} (0x{can_id:X})")
+        stats_window.geometry("400x300")
+        stats_window.resizable(False, False)
+        
+        # 统计信息文本
+        stats_text = f"""
+🎯 信号信息:
+  • 信号名称: {config['name']}
+  • CAN ID: 0x{can_id:X}
+  • 位位置: {config['start_bit']}-{config['start_bit']+config['length']-1}
+  • 字节序: {'大端' if config['endian'] == 'big' else '小端'}
+
+📊 帧统计:
+  • 估算周期: {frame_stats['period_ms']:.2f} ms
+  • 实际帧数: {frame_stats['total_frames']} 帧
+  • 期望帧数: {frame_stats['expected_frames']} 帧
+  • 丢失帧数: {frame_stats['dropped_frames']} 帧
+  • 丢帧率: {frame_stats['drop_rate']:.2f}%
+  • 时间跨度: {frame_stats['time_span']:.3f} 秒
+
+💡 分析建议:
+"""
+        
+        # 添加分析建议
+        if frame_stats['drop_rate'] < 1:
+            stats_text += "  ✅ 通信质量良好，丢帧率很低"
+        elif frame_stats['drop_rate'] < 5:
+            stats_text += "  ⚠️ 存在少量丢帧，建议检查网络负载"
+        else:
+            stats_text += "  ❌ 丢帧率较高，可能存在网络问题"
+        
+        if frame_stats['period_ms'] < 10:
+            stats_text += "\n  📈 高频信号，注意处理性能"
+        elif frame_stats['period_ms'] > 1000:
+            stats_text += "\n  📉 低频信号，适合状态监控"
+        
+        # 显示统计信息
+        text_widget = tk.Text(stats_window, wrap=tk.WORD, padx=10, pady=10)
+        text_widget.pack(fill=tk.BOTH, expand=True, padx=10, pady=10)
+        text_widget.insert(tk.END, stats_text)
+        text_widget.config(state=tk.DISABLED)
+        
+        # 关闭按钮
+        ttk.Button(stats_window, text="关闭", command=stats_window.destroy).pack(pady=10)
     
     def clear_signals(self):
         """清除所有信号"""
@@ -575,13 +793,42 @@ class MultiSignalChartViewer:
                 if timestamps:
                     current_ax = axes[i if subplot_mode else 0]
                     
-                    # 绘制曲线
+                    # 绘制正常数据曲线
                     line = current_ax.plot(timestamps, values, 
                            color=config['color'], 
                            linewidth=1.5, 
                            marker='o', 
                            markersize=2,
                            label=f"{config['name']} (0x{config['can_id']:X})")
+                    
+                    # 添加丢帧点显示
+                    if self.show_dropped_frames_var.get():
+                        # 计算该信号的帧统计（获取周期）
+                        frame_stats = self.calculate_frame_stats(config['can_id'])
+                        if frame_stats and frame_stats['period_ms'] > 0:
+                            period_seconds = frame_stats['period_ms'] / 1000.0
+                            
+                            # 检测丢帧位置
+                            dropped_times = self.detect_dropped_frame_positions(config['can_id'], period_seconds)
+                            
+                            if dropped_times:
+                                # 对丢帧时间进行时间范围过滤
+                                filtered_dropped_times = []
+                                for drop_time in dropped_times:
+                                    if time_start is None or drop_time >= time_start:
+                                        if time_end is None or drop_time <= time_end:
+                                            filtered_dropped_times.append(drop_time)
+                                
+                                if filtered_dropped_times:
+                                    # 在丢帧位置插值计算信号值
+                                    interpolated_values = self.interpolate_signal_at_dropped_frames(
+                                        timestamps, values, filtered_dropped_times)
+                                    
+                                    # 绘制丢帧点（红色大点）
+                                    current_ax.scatter(filtered_dropped_times, interpolated_values,
+                                                     color='red', s=50, marker='X', 
+                                                     alpha=0.8, zorder=5,
+                                                     label=f'丢帧点({len(filtered_dropped_times)}个)')
                     
                     # 子图模式下的标题和标签
                     if subplot_mode:
