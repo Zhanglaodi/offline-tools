@@ -592,7 +592,7 @@ class MultiSignalChartViewer:
         """显示关于信息"""
         about_window = tk.Toplevel(self.root)
         about_window.title("关于")
-        about_window.geometry("450x400")
+        about_window.geometry("450x700")
         about_window.resizable(False, False)
         
         # 主标题
