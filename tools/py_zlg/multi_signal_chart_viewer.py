@@ -23,6 +23,7 @@ project_root = Path(__file__).parent
 sys.path.insert(0, str(project_root))
 
 from simple_asc_reader import SimpleASCReader
+from help_manager import HelpTextManager
 
 # 设置中文字体
 plt.rcParams['font.sans-serif'] = ['SimHei', 'Microsoft YaHei', 'Arial Unicode MS']
@@ -49,21 +50,58 @@ class MultiSignalChartViewer:
         self.signal_data_cache = {}  # 缓存信号数据
         self.dropped_frames_cache = {}  # 缓存丢帧检测结果
         
-        # 默认信号配置
-        self.signal_presets = {
-            "第1字节 (0-7位)": {"start": 0, "length": 8, "factor": 1.0, "offset": 0.0, "signed": False, "endian": "big"},
-            "前2字节转速 (0-15位)": {"start": 0, "length": 16, "factor": 0.25, "offset": 0.0, "signed": False, "endian": "big"},
-            "温度信号 (16-23位)": {"start": 16, "length": 8, "factor": 1.0, "offset": -40.0, "signed": False, "endian": "big"},
-            "电压信号 (0-11位)": {"start": 0, "length": 12, "factor": 0.01, "offset": 0.0, "signed": False, "endian": "big"},
-            "有符号温度 (24-31位)": {"start": 24, "length": 8, "factor": 0.5, "offset": 0.0, "signed": True, "endian": "big"},
-            "小端16位信号 (0-15位)": {"start": 0, "length": 16, "factor": 1.0, "offset": 0.0, "signed": False, "endian": "little"},
-        }
+        # 帮助文本管理器
+        self.help_manager = HelpTextManager()
         
         # 创建界面
         self.create_widgets()
     
+    def create_menu(self):
+        """创建菜单栏"""
+        menubar = tk.Menu(self.root)
+        self.root.config(menu=menubar)
+        
+        # 文件菜单
+        file_menu = tk.Menu(menubar, tearoff=0)
+        menubar.add_cascade(label="文件", menu=file_menu)
+        file_menu.add_command(label="打开ASC文件", command=self.load_file, accelerator="Ctrl+O")
+        file_menu.add_separator()
+        file_menu.add_command(label="退出", command=self.root.quit, accelerator="Ctrl+Q")
+        
+        # 视图菜单
+        view_menu = tk.Menu(menubar, tearoff=0)
+        menubar.add_cascade(label="视图", menu=view_menu)
+        view_menu.add_checkbutton(label="显示网格", variable=self.show_grid_var, command=self.update_chart)
+        view_menu.add_checkbutton(label="子图模式", variable=self.subplot_mode_var, command=self.update_chart)
+        view_menu.add_checkbutton(label="显示丢帧点", variable=self.show_dropped_frames_var, command=self.update_chart)
+        view_menu.add_separator()
+        view_menu.add_command(label="清除所有信号", command=self.clear_signals)
+        
+        # 帮助菜单
+        help_menu = tk.Menu(menubar, tearoff=0)
+        menubar.add_cascade(label="帮助", menu=help_menu)
+        help_menu.add_command(label="使用指南", command=self.show_user_guide)
+        help_menu.add_command(label="快捷键", command=self.show_shortcuts)
+        help_menu.add_command(label="功能说明", command=self.show_features)
+        help_menu.add_separator()
+        help_menu.add_command(label="关于", command=self.show_about)
+        
+        # 绑定快捷键
+        self.root.bind('<Control-o>', lambda e: self.load_file())
+        self.root.bind('<Control-q>', lambda e: self.root.quit())
+        self.root.bind('<F1>', lambda e: self.show_user_guide())
+    
     def create_widgets(self):
         """创建界面组件"""
+        # 先定义菜单相关变量
+        self.show_grid_var = tk.BooleanVar(value=True)
+        self.show_legend_var = tk.BooleanVar(value=True)
+        self.subplot_mode_var = tk.BooleanVar(value=False)
+        self.show_dropped_frames_var = tk.BooleanVar(value=False)
+        
+        # 创建菜单
+        self.create_menu()
+        
         # 主框架
         main_frame = ttk.Frame(self.root)
         main_frame.pack(fill=tk.BOTH, expand=True, padx=10, pady=10)
@@ -90,16 +128,6 @@ class MultiSignalChartViewer:
         self.can_id_var = tk.StringVar()
         self.can_id_combo = ttk.Combobox(id_frame, textvariable=self.can_id_var, state="readonly", width=12)
         self.can_id_combo.pack(side=tk.RIGHT)
-        
-        # 预设信号
-        preset_frame = ttk.Frame(add_frame)
-        preset_frame.pack(fill=tk.X, pady=2)
-        ttk.Label(preset_frame, text="预设:", width=8).pack(side=tk.LEFT)
-        self.preset_var = tk.StringVar()
-        preset_combo = ttk.Combobox(preset_frame, textvariable=self.preset_var, 
-                                  values=list(self.signal_presets.keys()), state="readonly", width=12)
-        preset_combo.pack(side=tk.RIGHT)
-        preset_combo.bind('<<ComboboxSelected>>', self.on_preset_changed)
         
         # 信号配置
         ttk.Separator(add_frame, orient=tk.HORIZONTAL).pack(fill=tk.X, pady=5)
@@ -197,11 +225,9 @@ class MultiSignalChartViewer:
         ttk.Checkbutton(display_frame, text="显示网格", variable=self.show_grid_var,
                        command=self.update_chart).pack(anchor=tk.W)
         
-        self.subplot_mode_var = tk.BooleanVar(value=False)
         ttk.Checkbutton(display_frame, text="子图模式", variable=self.subplot_mode_var,
                        command=self.update_chart).pack(anchor=tk.W)
         
-        self.show_dropped_frames_var = tk.BooleanVar(value=False)
         ttk.Checkbutton(display_frame, text="显示丢帧点", variable=self.show_dropped_frames_var,
                        command=self.update_chart).pack(anchor=tk.W)
         
@@ -401,6 +427,114 @@ class MultiSignalChartViewer:
         
         return interpolated_values
     
+    def show_user_guide(self):
+        """显示用户指南"""
+        guide_window = tk.Toplevel(self.root)
+        guide_window.title("CAN信号分析器 - 使用指南")
+        guide_window.geometry("800x600")
+        guide_window.resizable(True, True)
+        
+        # 创建滚动文本框
+        text_frame = ttk.Frame(guide_window)
+        text_frame.pack(fill=tk.BOTH, expand=True, padx=10, pady=10)
+        
+        scrollbar = ttk.Scrollbar(text_frame)
+        scrollbar.pack(side=tk.RIGHT, fill=tk.Y)
+        
+        text_widget = tk.Text(text_frame, wrap=tk.WORD, yscrollcommand=scrollbar.set, 
+                             font=("Arial", 10), padx=10, pady=10)
+        text_widget.pack(side=tk.LEFT, fill=tk.BOTH, expand=True)
+        scrollbar.config(command=text_widget.yview)
+        
+        # 使用帮助管理器加载文本
+        guide_text = self.help_manager.get_user_guide()
+        text_widget.insert(tk.END, guide_text)
+        text_widget.config(state=tk.DISABLED)
+        
+        # 关闭按钮
+        ttk.Button(guide_window, text="关闭", command=guide_window.destroy).pack(pady=10)
+    
+    def show_shortcuts(self):
+        """显示快捷键"""
+        shortcuts_window = tk.Toplevel(self.root)
+        shortcuts_window.title("快捷键说明")
+        shortcuts_window.geometry("500x400")
+        shortcuts_window.resizable(False, False)
+        
+        text_widget = tk.Text(shortcuts_window, wrap=tk.WORD, padx=20, pady=20, font=("Consolas", 11))
+        text_widget.pack(fill=tk.BOTH, expand=True)
+        
+        # 使用帮助管理器加载文本
+        shortcuts_text = self.help_manager.get_shortcuts()
+        text_widget.insert(tk.END, shortcuts_text)
+        text_widget.config(state=tk.DISABLED)
+        
+        ttk.Button(shortcuts_window, text="关闭", command=shortcuts_window.destroy).pack(pady=10)
+    
+    def show_features(self):
+        """显示功能说明"""
+        features_window = tk.Toplevel(self.root)
+        features_window.title("功能特性说明")
+        features_window.geometry("700x500")
+        features_window.resizable(True, True)
+        
+        # 创建标签页
+        notebook = ttk.Notebook(features_window)
+        notebook.pack(fill=tk.BOTH, expand=True, padx=10, pady=10)
+        
+        # 基础功能标签页
+        basic_frame = ttk.Frame(notebook)
+        notebook.add(basic_frame, text="基础功能")
+        
+        basic_text = tk.Text(basic_frame, wrap=tk.WORD, padx=10, pady=10)
+        basic_text.pack(fill=tk.BOTH, expand=True)
+        basic_content = self.help_manager.get_features_basic()
+        basic_text.insert(tk.END, basic_content)
+        basic_text.config(state=tk.DISABLED)
+        
+        # 高级功能标签页
+        advanced_frame = ttk.Frame(notebook)
+        notebook.add(advanced_frame, text="高级功能")
+        
+        advanced_text = tk.Text(advanced_frame, wrap=tk.WORD, padx=10, pady=10)
+        advanced_text.pack(fill=tk.BOTH, expand=True)
+        advanced_content = self.help_manager.get_features_advanced()
+        advanced_text.insert(tk.END, advanced_content)
+        advanced_text.config(state=tk.DISABLED)
+        
+        # 技术特性标签页
+        tech_frame = ttk.Frame(notebook)
+        notebook.add(tech_frame, text="技术特性")
+        
+        tech_text = tk.Text(tech_frame, wrap=tk.WORD, padx=10, pady=10)
+        tech_text.pack(fill=tk.BOTH, expand=True)
+        tech_content = self.help_manager.get_features_technical()
+        tech_text.insert(tk.END, tech_content)
+        tech_text.config(state=tk.DISABLED)
+        
+        ttk.Button(features_window, text="关闭", command=features_window.destroy).pack(pady=10)
+    
+    def show_about(self):
+        """显示关于信息"""
+        about_window = tk.Toplevel(self.root)
+        about_window.title("关于")
+        about_window.geometry("450x400")
+        about_window.resizable(False, False)
+        
+        # 主标题
+        title_label = tk.Label(about_window, text="CAN多信号曲线图查看器", 
+                              font=("Arial", 16, "bold"), fg="navy")
+        title_label.pack(pady=20)
+        
+        # 使用帮助管理器获取关于信息
+        about_text = self.help_manager.get_about_info()
+        desc_label = tk.Label(about_window, text=about_text, font=("Arial", 10), 
+                             justify=tk.LEFT, wraplength=400)
+        desc_label.pack(pady=20, padx=20)
+        
+        # 关闭按钮
+        ttk.Button(about_window, text="关闭", command=about_window.destroy).pack(pady=10)
+    
     def load_file(self):
         """加载ASC文件"""
         file_path = filedialog.askopenfilename(
@@ -459,19 +593,6 @@ class MultiSignalChartViewer:
         except Exception as e:
             messagebox.showerror("错误", f"加载文件失败: {e}")
             self.status_label.config(text="加载文件失败")
-    
-    def on_preset_changed(self, event=None):
-        """预设信号改变"""
-        preset_name = self.preset_var.get()
-        if preset_name in self.signal_presets:
-            preset = self.signal_presets[preset_name]
-            self.start_bit_var.set(str(preset['start']))
-            self.length_var.set(str(preset['length']))
-            self.factor_var.set(str(preset['factor']))
-            self.offset_var.set(str(preset['offset']))
-            self.signed_var.set(preset['signed'])
-            self.endian_var.set(preset['endian'])
-            self.signal_name_var.set(preset_name)
     
     def add_signal(self):
         """添加信号到列表"""
@@ -979,38 +1100,6 @@ def main():
     """主函数"""
     root = tk.Tk()
     app = MultiSignalChartViewer(root)
-    
-    # 尝试加载示例文件
-    sample_file = "sample_data.asc"
-    if os.path.exists(sample_file):
-        try:
-            reader = SimpleASCReader()
-            app.messages = reader.read_file(sample_file)
-            app.file_label.config(text=f"已加载: {sample_file}")
-            
-            # 统计CAN ID
-            can_id_stats = defaultdict(int)
-            for msg in app.messages:
-                can_id_stats[msg['can_id']] += 1
-            
-            # 更新CAN ID选择框
-            can_ids = [f"0x{can_id:X}" for can_id in sorted(can_id_stats.keys())]
-            app.can_id_combo['values'] = can_ids
-            
-            if can_ids:
-                app.can_id_combo.current(0)
-            
-            app.status_label.config(text=f"已加载示例文件: {len(app.messages)} 条消息")
-            
-            # 初始化时间范围
-            if app.messages:
-                min_time = min(msg['timestamp'] for msg in app.messages)
-                max_time = max(msg['timestamp'] for msg in app.messages)
-                app.time_start_var.set(f"{min_time:.3f}")
-                app.time_end_var.set(f"{max_time:.3f}")
-                app.current_time_range = (min_time, max_time)
-        except:
-            pass
     
     root.mainloop()
 
