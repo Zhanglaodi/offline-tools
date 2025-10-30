@@ -52,7 +52,7 @@ class HelpTextManager:
 
 版本 3.0.0 - 交互式增强版
 
-作者：zxt
+作者：揍你了哈
 邮箱：1535852024@qq.com
 
 🎯 专业级CAN信号分析工具
