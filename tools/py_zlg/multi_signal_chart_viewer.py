@@ -40,6 +40,9 @@ class MultiSignalChartViewer:
         self.signal_configs = []  # 存储多个信号配置
         self.colors = ['blue', 'red', 'green', 'orange', 'purple', 'brown', 'pink', 'gray', 'olive', 'cyan']
         
+        # 界面控制变量
+        self.crosshair_enabled = tk.BooleanVar(value=True)
+        
         # 性能优化缓存
         self.frame_stats_cache = {}  # 缓存帧统计结果
         self.signal_data_cache = {}  # 缓存信号提取结果
@@ -225,6 +228,9 @@ class MultiSignalChartViewer:
         ttk.Checkbutton(display_frame, text="显示网格", variable=self.show_grid_var,
                        command=self.update_chart).pack(anchor=tk.W)
         
+        ttk.Checkbutton(display_frame, text="显示十字线", variable=self.crosshair_enabled,
+                       command=self.toggle_crosshair).pack(anchor=tk.W)
+        
         ttk.Checkbutton(display_frame, text="子图模式", variable=self.subplot_mode_var,
                        command=self.update_chart).pack(anchor=tk.W)
         
@@ -260,6 +266,8 @@ class MultiSignalChartViewer:
         
         # 创建图表
         self.figure = Figure(figsize=(10, 8), dpi=100)
+        # 设置figure的一些优化选项
+        self.figure.patch.set_facecolor('white')
         self.canvas = FigureCanvasTkAgg(self.figure, chart_frame)
         self.canvas.get_tk_widget().pack(fill=tk.BOTH, expand=True)
         
@@ -275,9 +283,22 @@ class MultiSignalChartViewer:
         # 连接事件处理器
         self.canvas.mpl_connect('button_release_event', self.on_mouse_release)
         self.canvas.mpl_connect('scroll_event', self.on_mouse_scroll)
+        self.canvas.mpl_connect('button_press_event', self.on_mouse_press)
+        self.canvas.mpl_connect('motion_notify_event', self.on_mouse_move)
         
         # 滚轮缩放设置
         self.zoom_factor = 1.1  # 缩放倍数
+        
+        # 拖拽状态
+        self.dragging = False
+        self.drag_start_pos = None
+        self.drag_axis = None
+        self.last_drag_time = 0  # 用于控制拖拽重绘频率
+        self.drag_update_pending = False  # 防止重复的更新请求
+        
+        # 垂直线和数据显示
+        self.vlines = {}  # 存储每个子图的垂直线
+        self.data_annotations = {}  # 存储数据标注
         
         # 状态栏
         self.status_label = ttk.Label(self.root, text="请选择ASC文件并添加信号", relief=tk.SUNKEN)
@@ -833,6 +854,167 @@ class MultiSignalChartViewer:
             self.update_chart()
             self.status_label.config(text="已重置时间范围")
     
+    def on_mouse_press(self, event):
+        """鼠标按下事件，开始拖拽"""
+        if not event.inaxes or event.button != 1:  # 只响应左键
+            return
+        
+        # 记录拖拽开始状态
+        self.dragging = True
+        self.drag_start_pos = (event.xdata, event.ydata)
+        self.drag_axis = event.inaxes
+        
+        # 改变鼠标光标为移动样式
+        self.canvas.get_tk_widget().config(cursor="fleur")
+        
+    def on_mouse_move(self, event):
+        """鼠标移动事件处理，包括拖拽和十字线显示"""
+        # 处理拖拽
+        if self.dragging:
+            self.handle_drag(event)
+            return
+        
+        # 处理十字线显示
+        if self.crosshair_enabled.get() and event.inaxes:
+            self.update_crosshair(event)
+    
+    def handle_drag(self, event):
+        """处理拖拽操作"""
+        if not event.inaxes or not self.drag_start_pos:
+            return
+        
+        # 只有在同一个轴内拖拽才有效
+        if event.inaxes != self.drag_axis:
+            return
+        
+        # 控制重绘频率，避免过于频繁的更新
+        import time
+        current_time = time.time()
+        if current_time - self.last_drag_time < 0.05:  # 进一步降低到20fps，更流畅
+            return
+        self.last_drag_time = current_time
+        
+        # 计算Y轴移动距离
+        if event.ydata is None or self.drag_start_pos[1] is None:
+            return
+        
+        y_delta = event.ydata - self.drag_start_pos[1]
+        
+        # 避免微小移动导致的抖动
+        if abs(y_delta) < 0.005:  # 增加阈值，减少微小抖动
+            return
+        
+        # 获取当前Y轴范围
+        ylim = self.drag_axis.get_ylim()
+        y_range = ylim[1] - ylim[0]
+        
+        # 移动Y轴（向上拖拽图表向下移动，向下拖拽图表向上移动）
+        new_ylim = [ylim[0] - y_delta, ylim[1] - y_delta]
+        self.drag_axis.set_ylim(new_ylim)
+        
+        # 更新拖拽起始位置
+        self.drag_start_pos = (event.xdata, event.ydata)
+        
+        # 防止重复的更新请求
+        if not self.drag_update_pending:
+            self.drag_update_pending = True
+            # 使用after方法延迟更新，避免频繁重绘
+            self.root.after_idle(self._delayed_drag_update)
+    
+    def update_crosshair(self, event):
+        """更新十字线和数据显示"""
+        if not event.xdata or not event.ydata:
+            return
+        
+        x_pos = event.xdata
+        
+        # 清除之前的十字线和标注
+        self.clear_crosshair()
+        
+        # 为每个子图添加垂直线和数据标注
+        if hasattr(self, 'axes_list') and self.axes_list:
+            for ax in self.axes_list:
+                self.add_crosshair_to_axis(ax, x_pos)
+        elif hasattr(self, 'current_ax') and self.current_ax:
+            self.add_crosshair_to_axis(self.current_ax, x_pos)
+        
+        # 重绘画布
+        self.canvas.draw_idle()
+    
+    def add_crosshair_to_axis(self, ax, x_pos):
+        """为指定轴添加十字线和数据标注"""
+        # 添加垂直线
+        ylim = ax.get_ylim()
+        vline = ax.axvline(x_pos, color='red', linestyle='--', alpha=0.7, linewidth=1)
+        self.vlines[ax] = vline
+        
+        # 查找最接近的数据点并显示值
+        for line in ax.lines:
+            if line == vline:  # 跳过刚添加的垂直线
+                continue
+            
+            xdata = line.get_xdata()
+            ydata = line.get_ydata()
+            
+            if len(xdata) == 0:
+                continue
+            
+            # 找到最接近x_pos的数据点
+            idx = None
+            min_dist = float('inf')
+            for i, x_val in enumerate(xdata):
+                dist = abs(x_val - x_pos)
+                if dist < min_dist:
+                    min_dist = dist
+                    idx = i
+            
+            if idx is not None and min_dist < (max(xdata) - min(xdata)) * 0.01:  # 只有在合理范围内才显示
+                x_val = xdata[idx]
+                y_val = ydata[idx]
+                
+                # 添加数据标注
+                annotation = ax.annotate(f'({x_val:.3f}, {y_val:.3f})',
+                                       xy=(x_val, y_val),
+                                       xytext=(10, 10),
+                                       textcoords='offset points',
+                                       bbox=dict(boxstyle='round,pad=0.3', 
+                                               facecolor='yellow', 
+                                               alpha=0.8),
+                                       fontsize=9,
+                                       ha='left')
+                
+                if ax not in self.data_annotations:
+                    self.data_annotations[ax] = []
+                self.data_annotations[ax].append(annotation)
+                break  # 只显示第一条线的数据
+    
+    def clear_crosshair(self):
+        """清除所有十字线和数据标注"""
+        # 清除垂直线
+        for ax, vline in self.vlines.items():
+            if vline in ax.lines:
+                vline.remove()
+        self.vlines.clear()
+        
+        # 清除数据标注
+        for ax, annotations in self.data_annotations.items():
+            for annotation in annotations:
+                annotation.remove()
+        self.data_annotations.clear()
+    
+    def toggle_crosshair(self):
+        """切换十字线显示状态"""
+        if not self.crosshair_enabled.get():
+            self.clear_crosshair()
+            self.canvas.draw_idle()
+    
+    def _delayed_drag_update(self):
+        """延迟的拖拽更新，减少闪烁"""
+        try:
+            self.canvas.draw_idle()
+        finally:
+            self.drag_update_pending = False
+    
     def update_x_axis_time_format(self, ax):
         """更新X轴时间格式显示"""
         if not ax:
@@ -939,7 +1121,20 @@ class MultiSignalChartViewer:
         self.canvas.draw_idle()
     
     def on_mouse_release(self, event):
-        """鼠标释放事件，用于检测缩放操作"""
+        """鼠标释放事件，用于检测缩放操作和结束拖拽"""
+        # 结束拖拽状态
+        if self.dragging:
+            self.dragging = False
+            self.drag_start_pos = None
+            self.drag_axis = None
+            self.drag_update_pending = False
+            # 恢复默认鼠标光标
+            self.canvas.get_tk_widget().config(cursor="")
+            # 最终重绘确保显示正确
+            self.canvas.draw()  # 使用立即重绘确保最终状态正确
+            return
+        
+        # 处理子图x轴同步（原有逻辑）
         if not self.subplot_mode_active or not self.axes_list or len(self.axes_list) <= 1:
             return
         
@@ -1031,6 +1226,9 @@ class MultiSignalChartViewer:
                 axes = [ax] * n_signals
                 self.axes_list = [ax]
                 self.subplot_mode_active = False
+            
+            # 存储当前轴用于十字线功能
+            self.current_ax = self.axes_list[0] if self.axes_list else None
             
             total_points = 0
             all_timestamps = []
