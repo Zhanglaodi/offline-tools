@@ -33,7 +33,9 @@ class MultiSignalChartViewer:
     def __init__(self, root):
         self.root = root
         self.root.title("CAN多信号曲线图查看器")
-        self.root.geometry("1400x980")
+        
+        # 设置窗口全屏
+        self.setup_window()
         
         # 数据存储
         self.messages = []
@@ -65,6 +67,42 @@ class MultiSignalChartViewer:
         # 创建界面
         self.create_widgets()
     
+    def setup_window(self):
+        """设置窗口属性"""
+        # 获取屏幕尺寸
+        screen_width = self.root.winfo_screenwidth()
+        screen_height = self.root.winfo_screenheight()
+        
+        # 方式1: 最大化窗口（推荐）
+        try:
+            self.root.state('zoomed')  # Windows下最大化
+        except tk.TclError:
+            # 对于不支持zoomed的系统，使用全屏尺寸
+            self.root.geometry(f"{screen_width}x{screen_height}+0+0")
+        
+        # 设置最小窗口尺寸，防止窗口过小
+        self.root.minsize(1000, 700)
+        
+        # 绑定快捷键
+        self.root.bind('<F11>', self.toggle_fullscreen)
+        self.root.bind('<Escape>', self.exit_fullscreen)
+        
+        # 全屏状态标志
+        self.is_fullscreen = False
+    
+    def toggle_fullscreen(self, event=None):
+        """切换全屏状态"""
+        self.is_fullscreen = not self.is_fullscreen
+        if self.is_fullscreen:
+            self.root.attributes('-fullscreen', True)
+        else:
+            self.root.attributes('-fullscreen', False)
+    
+    def exit_fullscreen(self, event=None):
+        """退出全屏"""
+        self.is_fullscreen = False
+        self.root.attributes('-fullscreen', False)
+    
     def create_menu(self):
         """创建菜单栏"""
         menubar = tk.Menu(self.root)
@@ -83,6 +121,8 @@ class MultiSignalChartViewer:
         view_menu.add_checkbutton(label="显示网格", variable=self.show_grid_var, command=self.update_chart)
         view_menu.add_checkbutton(label="子图模式", variable=self.subplot_mode_var, command=self.update_chart)
         view_menu.add_checkbutton(label="显示丢帧点", variable=self.show_dropped_frames_var, command=self.update_chart)
+        view_menu.add_separator()
+        view_menu.add_command(label="切换全屏", command=self.toggle_fullscreen, accelerator="F11")
         view_menu.add_separator()
         view_menu.add_command(label="清除所有信号", command=self.clear_signals)
         
