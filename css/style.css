@@ -334,6 +334,100 @@ $2 .card h3 {
   opacity: .35
 }
 
+/* 作者信息弹窗样式 */
+.author-notification {
+  position: fixed;
+  top: 80px;
+  right: -350px;
+  width: 320px;
+  background: linear-gradient(135deg, #1a1a2e 0%, #16213e 100%);
+  border: 1px solid #00ff88;
+  border-radius: 12px;
+  box-shadow: 0 8px 32px rgba(0, 255, 136, 0.2);
+  z-index: 1000;
+  transition: right 0.5s cubic-bezier(0.25, 0.46, 0.45, 0.94);
+  font-family: 'Courier New', monospace;
+}
+
+.author-notification.show {
+  right: 20px;
+}
+
+.author-notification .close-btn {
+  position: absolute;
+  top: 10px;
+  right: 15px;
+  background: none;
+  border: none;
+  color: #00ff88;
+  font-size: 20px;
+  cursor: pointer;
+  width: 25px;
+  height: 25px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 50%;
+  transition: all 0.3s ease;
+}
+
+.author-notification .close-btn:hover {
+  background: rgba(0, 255, 136, 0.1);
+  transform: rotate(90deg);
+}
+
+.author-content {
+  padding: 20px;
+  color: #e0e0e0;
+}
+
+.author-icon {
+  font-size: 24px;
+  text-align: center;
+  margin-bottom: 10px;
+}
+
+.author-content h3 {
+  color: #00ff88;
+  margin: 0 0 15px 0;
+  font-size: 16px;
+  text-align: center;
+  text-shadow: 0 0 10px rgba(0, 255, 136, 0.5);
+}
+
+.author-info p {
+  margin: 8px 0;
+  font-size: 13px;
+  line-height: 1.4;
+}
+
+.author-info strong {
+  color: #00ff88;
+  font-weight: 600;
+}
+
+.author-message {
+  margin-top: 15px;
+  padding: 10px;
+  background: rgba(0, 255, 136, 0.1);
+  border-radius: 6px;
+  font-size: 12px;
+  line-height: 1.4;
+  border-left: 3px solid #00ff88;
+}
+
+/* 响应式 */
+@media (max-width: 768px) {
+  .author-notification {
+    width: 280px;
+    right: -300px;
+  }
+  
+  .author-notification.show {
+    right: 10px;
+  }
+}
+
 @media (max-width:640px) {
   .toolbar {
     grid-template-columns: 1fr;

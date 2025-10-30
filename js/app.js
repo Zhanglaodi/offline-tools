@@ -1,4 +1,3 @@
-
 // —— 数据层：默认示例，用户可增删改，存于 localStorage ——
 const STORAGE_KEY = 'links-hub-v1';
 
@@ -13,7 +12,8 @@ const DEFAULT_LINKS = [
     { id: crypto.randomUUID(), title: '塞弗转向-计算轮距', url: './tools/塞弗转向-计算轮距/index.html', desc: '塞弗转向-计算轮距', tags: ['汽车', '工具'], kind: 'LOCAL', online: true },
     { id: crypto.randomUUID(), title: 'CRC-校验', url: './tools/CRC-校验/index.html', desc: '支持自定义多项式，支持多种CRC校验', tags: ['工具', 'CRC校验'], kind: 'LOCAL', online: true },
     { id: crypto.randomUUID(), title: 'BCC-校验', url: './tools/BCC校验/index.html', desc: '支持BCC校验', tags: ['工具', 'BCC校验'], kind: 'LOCAL', online: true },
-    { id: crypto.randomUUID(), title: 'STM32 文档 (F4 HAL)', url: 'https://www.st.com/en/embedded-software/stm32cube-mcu-packages.html', desc: 'F4 HAL 参考与例程入口。', tags: ['STM32', 'HAL', '文档'], kind: 'WEB', online: true }
+    { id: crypto.randomUUID(), title: 'STM32 文档 (F4 HAL)', url: 'https://www.st.com/en/embedded-software/stm32cube-mcu-packages.html', desc: 'F4 HAL 参考与例程入口。', tags: ['STM32', 'HAL', '文档'], kind: 'WEB', online: true },
+    { id: crypto.randomUUID(), title: 'asc曲线工具(独立运行版)', url: 'https://pan.baidu.com/s/5iUl1EJqsuVKNUqp-m0dtJg', desc: 'asc文件曲线工具', tags: ['zlg', '曲线', '汽车'], kind: 'WEB', online: true }
 ];
 
 let state = {
@@ -219,6 +219,40 @@ function toast(msg) {
     d.textContent = msg; d.style.cssText = 'position:fixed;bottom:24px;left:50%;transform:translateX(-50%);background:#0f1710;border:1px solid rgba(92,230,92,.45);padding:10px 14px;border-radius:12px;box-shadow:var(--shadow);z-index:30';
     document.body.appendChild(d); setTimeout(() => d.remove(), 1800);
 }
+
+// 作者信息弹窗功能
+function initAuthorNotification() {
+  const notification = document.getElementById('author-notification');
+  const closeBtn = document.getElementById('close-author');
+  
+  // 页面加载后延迟显示
+  setTimeout(() => {
+    notification.classList.add('show');
+  }, 1000);
+  
+  // 关闭按钮事件
+  closeBtn.addEventListener('click', () => {
+    notification.classList.remove('show');
+  });
+  
+  // 5秒后自动关闭
+  setTimeout(() => {
+    notification.classList.remove('show');
+  }, 8000);
+  
+  // 点击弹窗外部区域关闭（可选）
+  notification.addEventListener('click', (e) => {
+    if (e.target === notification) {
+      notification.classList.remove('show');
+    }
+  });
+}
+
+// 在页面加载完成后初始化
+document.addEventListener('DOMContentLoaded', () => {
+  // ...existing code...
+  initAuthorNotification();
+});
 
 // 初始渲染
 render();
