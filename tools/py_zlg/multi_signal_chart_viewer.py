@@ -42,6 +42,12 @@ class MultiSignalChartViewer:
         
         # 界面控制变量
         self.crosshair_enabled = tk.BooleanVar(value=True)
+        self.measurement_mode = tk.BooleanVar(value=False)
+        
+        # 测量相关变量
+        self.measurement_points = []  # 存储测量点 [(x1, y1), (x2, y2)]
+        self.measurement_lines = {}   # 存储测量线
+        self.measurement_annotations = {}  # 存储测量标注
         
         # 性能优化缓存
         self.frame_stats_cache = {}  # 缓存帧统计结果
@@ -230,6 +236,9 @@ class MultiSignalChartViewer:
         
         ttk.Checkbutton(display_frame, text="显示十字线", variable=self.crosshair_enabled,
                        command=self.toggle_crosshair).pack(anchor=tk.W)
+        
+        ttk.Checkbutton(display_frame, text="测量模式", variable=self.measurement_mode,
+                       command=self.toggle_measurement_mode).pack(anchor=tk.W)
         
         ttk.Checkbutton(display_frame, text="子图模式", variable=self.subplot_mode_var,
                        command=self.update_chart).pack(anchor=tk.W)
@@ -855,23 +864,34 @@ class MultiSignalChartViewer:
             self.status_label.config(text="已重置时间范围")
     
     def on_mouse_press(self, event):
-        """鼠标按下事件，开始拖拽"""
-        if not event.inaxes or event.button != 1:  # 只响应左键
+        """鼠标按下事件，开始拖拽或设置测量点"""
+        if not event.inaxes:
             return
         
-        # 记录拖拽开始状态
-        self.dragging = True
-        self.drag_start_pos = (event.xdata, event.ydata)
-        self.drag_axis = event.inaxes
+        # 测量模式下的点击处理
+        if self.measurement_mode.get() and event.button == 1:
+            self.add_measurement_point(event)
+            return
         
-        # 改变鼠标光标为移动样式
-        self.canvas.get_tk_widget().config(cursor="fleur")
+        # 拖拽模式
+        if event.button == 1:
+            # 记录拖拽开始状态
+            self.dragging = True
+            self.drag_start_pos = (event.xdata, event.ydata)
+            self.drag_axis = event.inaxes
+            
+            # 改变鼠标光标为移动样式
+            self.canvas.get_tk_widget().config(cursor="fleur")
         
     def on_mouse_move(self, event):
         """鼠标移动事件处理，包括拖拽和十字线显示"""
         # 处理拖拽
         if self.dragging:
             self.handle_drag(event)
+            return
+        
+        # 测量模式下不显示十字线
+        if self.measurement_mode.get():
             return
         
         # 处理十字线显示
@@ -1008,6 +1028,156 @@ class MultiSignalChartViewer:
             self.clear_crosshair()
             self.canvas.draw_idle()
     
+    def toggle_measurement_mode(self):
+        """切换测量模式"""
+        if self.measurement_mode.get():
+            # 进入测量模式，清除现有测量
+            self.clear_measurement()
+            self.clear_crosshair()  # 也清除十字线
+            self.status_label.config(text="测量模式：左键点击两个点进行测量，右键清除")
+        else:
+            # 退出测量模式
+            self.clear_measurement()
+            self.status_label.config(text="已退出测量模式")
+    
+    def add_measurement_point(self, event):
+        """添加测量点"""
+        if not event.xdata or not event.ydata:
+            return
+        
+        x_pos = event.xdata
+        y_pos = event.ydata
+        
+        # 添加测量点
+        if len(self.measurement_points) >= 2:
+            # 如果已有两个点，清除重新开始
+            self.clear_measurement()
+        
+        self.measurement_points.append((x_pos, y_pos))
+        
+        # 绘制测量线和标注
+        self.update_measurement_display()
+    
+    def update_measurement_display(self):
+        """更新测量显示"""
+        # 清除之前的测量显示
+        self.clear_measurement_display()
+        
+        if not self.measurement_points:
+            return
+        
+        # 为每个子图添加测量线
+        axes_to_update = self.axes_list if self.axes_list else [self.current_ax] if self.current_ax else []
+        
+        for ax in axes_to_update:
+            if ax is None:
+                continue
+            
+            # 绘制第一个点
+            if len(self.measurement_points) >= 1:
+                x1, y1 = self.measurement_points[0]
+                ylim = ax.get_ylim()
+                
+                # 垂直线1
+                line1 = ax.axvline(x1, color='green', linestyle='-', alpha=0.8, linewidth=2)
+                if ax not in self.measurement_lines:
+                    self.measurement_lines[ax] = []
+                self.measurement_lines[ax].append(line1)
+                
+                # 标注点1
+                annotation1 = ax.annotate(f'P1({x1:.3f})',
+                                        xy=(x1, ylim[1]),
+                                        xytext=(5, -5),
+                                        textcoords='offset points',
+                                        bbox=dict(boxstyle='round,pad=0.3', 
+                                                facecolor='green', 
+                                                alpha=0.8),
+                                        fontsize=9,
+                                        ha='left')
+                
+                if ax not in self.measurement_annotations:
+                    self.measurement_annotations[ax] = []
+                self.measurement_annotations[ax].append(annotation1)
+            
+            # 绘制第二个点和测量结果
+            if len(self.measurement_points) >= 2:
+                x2, y2 = self.measurement_points[1]
+                ylim = ax.get_ylim()
+                
+                # 垂直线2
+                line2 = ax.axvline(x2, color='blue', linestyle='-', alpha=0.8, linewidth=2)
+                self.measurement_lines[ax].append(line2)
+                
+                # 标注点2
+                annotation2 = ax.annotate(f'P2({x2:.3f})',
+                                        xy=(x2, ylim[1]),
+                                        xytext=(5, -5),
+                                        textcoords='offset points',
+                                        bbox=dict(boxstyle='round,pad=0.3', 
+                                                facecolor='blue', 
+                                                alpha=0.8),
+                                        fontsize=9,
+                                        ha='left')
+                self.measurement_annotations[ax].append(annotation2)
+                
+                # 计算时间差
+                time_diff = abs(x2 - x1)
+                
+                # 在两线中间显示时间差
+                mid_x = (x1 + x2) / 2
+                mid_y = (ylim[0] + ylim[1]) / 2
+                
+                diff_annotation = ax.annotate(f'Δt = {time_diff:.3f}s',
+                                            xy=(mid_x, mid_y),
+                                            xytext=(0, 0),
+                                            textcoords='offset points',
+                                            bbox=dict(boxstyle='round,pad=0.5', 
+                                                    facecolor='yellow', 
+                                                    alpha=0.9),
+                                            fontsize=11,
+                                            ha='center',
+                                            weight='bold')
+                self.measurement_annotations[ax].append(diff_annotation)
+                
+                # 连接线
+                connection_line = ax.plot([x1, x2], [mid_y, mid_y], 
+                                        color='red', linestyle='--', alpha=0.7, linewidth=1)[0]
+                self.measurement_lines[ax].append(connection_line)
+        
+        # 更新状态显示
+        if len(self.measurement_points) == 1:
+            self.status_label.config(text="已设置第一个测量点，请点击第二个点")
+        elif len(self.measurement_points) == 2:
+            time_diff = abs(self.measurement_points[1][0] - self.measurement_points[0][0])
+            self.status_label.config(text=f"测量完成：时间差 = {time_diff:.6f}秒")
+        
+        # 重绘画布
+        self.canvas.draw_idle()
+    
+    def clear_measurement_display(self):
+        """清除测量显示元素"""
+        # 清除测量线
+        for ax, lines in self.measurement_lines.items():
+            for line in lines:
+                if hasattr(line, 'remove'):
+                    line.remove()
+        self.measurement_lines.clear()
+        
+        # 清除测量标注
+        for ax, annotations in self.measurement_annotations.items():
+            for annotation in annotations:
+                if hasattr(annotation, 'remove'):
+                    annotation.remove()
+        self.measurement_annotations.clear()
+    
+    def clear_measurement(self):
+        """清除所有测量"""
+        self.measurement_points.clear()
+        self.clear_measurement_display()
+        self.canvas.draw_idle()
+        if self.measurement_mode.get():
+            self.status_label.config(text="测量模式：左键点击两个点进行测量，右键清除")
+    
     def _delayed_drag_update(self):
         """延迟的拖拽更新，减少闪烁"""
         try:
@@ -1132,6 +1302,11 @@ class MultiSignalChartViewer:
             self.canvas.get_tk_widget().config(cursor="")
             # 最终重绘确保显示正确
             self.canvas.draw()  # 使用立即重绘确保最终状态正确
+            return
+        
+        # 测量模式下右键清除测量
+        if self.measurement_mode.get() and event.button == 3:  # 右键
+            self.clear_measurement()
             return
         
         # 处理子图x轴同步（原有逻辑）
