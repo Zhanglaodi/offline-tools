@@ -274,6 +274,10 @@ class MultiSignalChartViewer:
         
         # 连接事件处理器
         self.canvas.mpl_connect('button_release_event', self.on_mouse_release)
+        self.canvas.mpl_connect('scroll_event', self.on_mouse_scroll)
+        
+        # 滚轮缩放设置
+        self.zoom_factor = 1.1  # 缩放倍数
         
         # 状态栏
         self.status_label = ttk.Label(self.root, text="请选择ASC文件并添加信号", relief=tk.SUNKEN)
@@ -829,6 +833,111 @@ class MultiSignalChartViewer:
             self.update_chart()
             self.status_label.config(text="已重置时间范围")
     
+    def update_x_axis_time_format(self, ax):
+        """更新X轴时间格式显示"""
+        if not ax:
+            return
+        
+        try:
+            # 获取当前X轴范围
+            xlim = ax.get_xlim()
+            time_range = xlim[1] - xlim[0]
+            
+            # 根据时间范围选择合适的显示格式
+            if time_range > 60:  # 超过60秒，显示分:秒
+                from matplotlib.ticker import FuncFormatter
+                def time_formatter(x, pos):
+                    minutes = int(x // 60)
+                    seconds = x % 60
+                    return f"{minutes}:{seconds:05.2f}"
+                ax.xaxis.set_major_formatter(FuncFormatter(time_formatter))
+            elif time_range > 10:  # 10-60秒，显示秒数到小数点后1位
+                from matplotlib.ticker import FuncFormatter
+                def time_formatter(x, pos):
+                    return f"{x:.1f}s"
+                ax.xaxis.set_major_formatter(FuncFormatter(time_formatter))
+            else:  # 小于10秒，显示到小数点后3位
+                from matplotlib.ticker import FuncFormatter
+                def time_formatter(x, pos):
+                    return f"{x:.3f}s"
+                ax.xaxis.set_major_formatter(FuncFormatter(time_formatter))
+            
+            # 设置X轴标签
+            ax.set_xlabel('时间')
+            
+        except Exception as e:
+            print(f"更新X轴时间格式失败: {e}")
+    
+    def on_mouse_scroll(self, event):
+        """鼠标滚轮事件，用于缩放图表"""
+        if not event.inaxes:
+            return
+        
+        # 获取当前鼠标位置
+        x_center = event.xdata
+        y_center = event.ydata
+        
+        if x_center is None or y_center is None:
+            return
+        
+        # 获取当前轴的范围
+        xlim = event.inaxes.get_xlim()
+        ylim = event.inaxes.get_ylim()
+        
+        # 计算缩放因子 (向上滚动放大，向下滚动缩小)
+        if event.button == 'up':
+            scale_factor = 1 / self.zoom_factor
+        elif event.button == 'down':
+            scale_factor = self.zoom_factor
+        else:
+            return
+        
+        # 计算新的范围，以鼠标位置为中心缩放
+        x_range = xlim[1] - xlim[0]
+        y_range = ylim[1] - ylim[0]
+        
+        new_x_range = x_range * scale_factor
+        new_y_range = y_range * scale_factor
+        
+        # 计算新的边界，保持鼠标位置不变
+        x_ratio = (x_center - xlim[0]) / x_range
+        y_ratio = (y_center - ylim[0]) / y_range
+        
+        new_xlim = [
+            x_center - new_x_range * x_ratio,
+            x_center + new_x_range * (1 - x_ratio)
+        ]
+        new_ylim = [
+            y_center - new_y_range * y_ratio,
+            y_center + new_y_range * (1 - y_ratio)
+        ]
+        
+        # 应用新的范围
+        event.inaxes.set_xlim(new_xlim)
+        event.inaxes.set_ylim(new_ylim)
+        
+        # 如果是子图模式，同步所有子图的x轴
+        if self.subplot_mode_active and self.axes_list and len(self.axes_list) > 1:
+            for ax in self.axes_list:
+                if ax != event.inaxes:
+                    ax.set_xlim(new_xlim)
+        
+        # 更新X轴时间标签格式
+        self.update_x_axis_time_format(event.inaxes)
+        if self.subplot_mode_active and self.axes_list:
+            for ax in self.axes_list:
+                if ax != event.inaxes:
+                    self.update_x_axis_time_format(ax)
+        
+        # 更新时间范围显示
+        if hasattr(self, 'time_start_var') and hasattr(self, 'time_end_var'):
+            self.time_start_var.set(f"{new_xlim[0]:.3f}")
+            self.time_end_var.set(f"{new_xlim[1]:.3f}")
+            self.current_time_range = new_xlim
+        
+        # 重绘画布
+        self.canvas.draw_idle()
+    
     def on_mouse_release(self, event):
         """鼠标释放事件，用于检测缩放操作"""
         if not self.subplot_mode_active or not self.axes_list or len(self.axes_list) <= 1:
@@ -843,6 +952,10 @@ class MultiSignalChartViewer:
             for ax in self.axes_list:
                 if ax != event.inaxes:
                     ax.set_xlim(xlim)
+                    self.update_x_axis_time_format(ax)
+            
+            # 更新当前轴的时间格式
+            self.update_x_axis_time_format(event.inaxes)
             
             # 更新时间范围显示
             self.time_start_var.set(f"{xlim[0]:.3f}")
@@ -1078,6 +1191,12 @@ class MultiSignalChartViewer:
                 # 同步所有子图的x轴
                 for ax in self.axes_list:
                     ax.set_xlim(min_time, max_time)
+                    # 更新每个子图的X轴时间格式
+                    self.update_x_axis_time_format(ax)
+            
+            # 如果是单图模式，也更新时间格式
+            if not subplot_mode and ax:
+                self.update_x_axis_time_format(ax)
             
             # 调整布局
             self.figure.tight_layout()
