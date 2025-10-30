@@ -23,6 +23,15 @@ class ASCFileSplitterGUI:
         self.output_dir = ""
         self.is_processing = False
         
+        # 缓存文件分析结果，避免重复读取
+        self.cached_file_info = {
+            'file_path': '',
+            'total_lines': 0,
+            'data_lines': 0,
+            'file_size': 0
+        }
+        self.update_timer = None  # 防抖定时器
+        
     def setup_ui(self):
         """设置现代化用户界面"""
         self.root.title("🔪 ASC文件分割器 v1.0")
@@ -163,7 +172,10 @@ class ASCFileSplitterGUI:
             if not self.output_dir:
                 self.output_dir = os.path.dirname(filename)
                 self.output_dir_var.set(self.output_dir)
-            self.update_preview()
+            
+            # 清除缓存，强制重新分析文件
+            self.cached_file_info['file_path'] = ''
+            self.analyze_file_in_background()
     
     def browse_output_dir(self):
         """浏览输出目录"""
@@ -182,39 +194,96 @@ class ASCFileSplitterGUI:
             self.value_label.config(text="每个文件行数：")
             self.value_spinbox.config(from_=100, to=1000000)
             self.split_value.set(1000)
-        self.update_preview()
+        self.update_preview_debounced()
     
-    def update_preview(self, *args):
-        """更新预览信息"""
+    def analyze_file_in_background(self):
+        """在后台分析文件，避免阻塞UI"""
         if not self.input_file or not os.path.exists(self.input_file):
             self.info_label.config(text="")
             return
         
+        # 如果文件已经分析过，直接更新预览
+        if self.cached_file_info['file_path'] == self.input_file:
+            self.update_preview_from_cache()
+            return
+        
+        # 显示分析中状态
+        self.info_label.config(text="正在分析文件...")
+        
+        def analyze_worker():
+            try:
+                # 读取并分析文件
+                with open(self.input_file, 'r', encoding='utf-8', errors='ignore') as f:
+                    lines = f.readlines()
+                
+                # 解析文件结构，获取数据行数
+                _, data_lines, _ = self.parse_asc_file(lines)
+                data_line_count = len(data_lines)
+                total_line_count = len(lines)
+                file_size = os.path.getsize(self.input_file) / (1024 * 1024)  # MB
+                
+                # 更新缓存
+                self.cached_file_info = {
+                    'file_path': self.input_file,
+                    'total_lines': total_line_count,
+                    'data_lines': data_line_count,
+                    'file_size': file_size
+                }
+                
+                # 在主线程中更新UI
+                self.root.after(0, self.update_preview_from_cache)
+                
+            except Exception as e:
+                self.root.after(0, lambda: self.info_label.config(text=f"读取文件信息失败: {str(e)}"))
+        
+        # 在后台线程中执行文件分析
+        thread = threading.Thread(target=analyze_worker)
+        thread.daemon = True
+        thread.start()
+    
+    def update_preview_debounced(self, *args):
+        """防抖的预览更新，避免频繁触发"""
+        # 取消之前的定时器
+        if self.update_timer:
+            self.root.after_cancel(self.update_timer)
+        
+        # 设置新的定时器，300ms后执行更新
+        self.update_timer = self.root.after(300, self.update_preview_from_cache)
+    
+    def update_preview_from_cache(self):
+        """从缓存中更新预览信息，避免重复读取文件"""
+        if not self.input_file or self.cached_file_info['file_path'] != self.input_file:
+            self.info_label.config(text="")
+            return
+        
         try:
-            # 读取并分析文件
-            with open(self.input_file, 'r', encoding='utf-8', errors='ignore') as f:
-                lines = f.readlines()
-            
-            # 解析文件结构，获取数据行数
-            _, data_lines, _ = self.parse_asc_file(lines)
-            data_line_count = len(data_lines)
-            total_line_count = len(lines)
-            
-            file_size = os.path.getsize(self.input_file) / (1024 * 1024)  # MB
+            data_line_count = self.cached_file_info['data_lines']
+            total_line_count = self.cached_file_info['total_lines']
+            file_size = self.cached_file_info['file_size']
             
             if self.split_method.get() == "count":
                 file_count = self.split_value.get()
-                lines_per_file = math.ceil(data_line_count / file_count)
-                info_text = f"总行数: {total_line_count:,} | 数据行数: {data_line_count:,} | 文件大小: {file_size:.1f}MB | 将分割为 {file_count} 个文件，每个约 {lines_per_file:,} 行数据"
+                if file_count > 0:
+                    lines_per_file = math.ceil(data_line_count / file_count)
+                    info_text = f"总行数: {total_line_count:,} | 数据行数: {data_line_count:,} | 文件大小: {file_size:.1f}MB | 将分割为 {file_count} 个文件，每个约 {lines_per_file:,} 行数据"
+                else:
+                    info_text = f"总行数: {total_line_count:,} | 数据行数: {data_line_count:,} | 文件大小: {file_size:.1f}MB"
             else:
                 lines_per_file = self.split_value.get()
-                file_count = math.ceil(data_line_count / lines_per_file)
-                info_text = f"总行数: {total_line_count:,} | 数据行数: {data_line_count:,} | 文件大小: {file_size:.1f}MB | 将分割为 {file_count} 个文件，每个 {lines_per_file:,} 行数据"
+                if lines_per_file > 0:
+                    file_count = math.ceil(data_line_count / lines_per_file)
+                    info_text = f"总行数: {total_line_count:,} | 数据行数: {data_line_count:,} | 文件大小: {file_size:.1f}MB | 将分割为 {file_count} 个文件，每个 {lines_per_file:,} 行数据"
+                else:
+                    info_text = f"总行数: {total_line_count:,} | 数据行数: {data_line_count:,} | 文件大小: {file_size:.1f}MB"
             
             self.info_label.config(text=info_text)
             
         except Exception as e:
-            self.info_label.config(text=f"读取文件信息失败: {str(e)}")
+            self.info_label.config(text=f"更新预览失败: {str(e)}")
+
+    def update_preview(self, *args):
+        """更新预览信息（保持兼容性，内部调用防抖版本）"""
+        self.update_preview_debounced(*args)
     
     def validate_inputs(self):
         """验证输入"""
@@ -465,6 +534,7 @@ base hex timestamps absolute
 
 🔗 技术支持：
 如有问题请联系开发者
+开发者：zhanglaodi
 """
         
         help_window = tk.Toplevel(self.root)
