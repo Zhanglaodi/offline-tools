@@ -643,8 +643,23 @@ class MultiSignalChartViewer:
             self.signal_data_cache.clear()
             self.dropped_frames_cache.clear()
             
-            # 更新CAN ID选择框
-            can_ids = [f"0x{can_id:X}" for can_id in sorted(can_id_stats.keys())]
+            # 统计扩展帧信息
+            frame_type_info = {}
+            for msg in self.messages:
+                can_id = msg['can_id']
+                if can_id not in frame_type_info:
+                    is_extended = msg.get('is_extended', can_id > 0x7FF)
+                    frame_type_info[can_id] = is_extended
+            
+            # 更新CAN ID选择框（显示帧类型）
+            can_ids = []
+            for can_id in sorted(can_id_stats.keys()):
+                is_extended = frame_type_info.get(can_id, can_id > 0x7FF)
+                if is_extended:
+                    can_ids.append(f"0x{can_id:X} (扩展帧)")
+                else:
+                    can_ids.append(f"0x{can_id:X} (标准帧)")
+            
             self.can_id_combo['values'] = can_ids
             
             if can_ids:
@@ -680,7 +695,14 @@ class MultiSignalChartViewer:
             return
         
         try:
-            can_id = int(can_id_str, 16)
+            # 从下拉框文本中提取CAN ID（支持带帧类型标识的格式）
+            if "0x" in can_id_str:
+                # 提取0x后面的十六进制数字，忽略后面的帧类型标识
+                hex_part = can_id_str.split("(")[0].strip()  # 移除帧类型标识
+                can_id = int(hex_part, 16)
+            else:
+                can_id = int(can_id_str, 16)
+                
             start_bit = int(self.start_bit_var.get())
             length = int(self.length_var.get())
             factor = float(self.factor_var.get())
@@ -775,6 +797,16 @@ class MultiSignalChartViewer:
         
         # 创建统计信息窗口
         stats_window = tk.Toplevel(self.root)
+        # 获取帧类型信息
+        frame_type = "未知"
+        for msg in self.messages:
+            if msg['can_id'] == can_id:
+                if 'is_extended' in msg:
+                    frame_type = "扩展帧" if msg['is_extended'] else "标准帧"
+                else:
+                    frame_type = "扩展帧" if can_id > 0x7FF else "标准帧"
+                break
+        
         stats_window.title(f"信号统计 - {config['name']} (0x{can_id:X})")
         stats_window.geometry("400x300")
         stats_window.resizable(False, False)
@@ -783,7 +815,7 @@ class MultiSignalChartViewer:
         stats_text = f"""
 🎯 信号信息:
   • 信号名称: {config['name']}
-  • CAN ID: 0x{can_id:X}
+  • CAN ID: 0x{can_id:X} ({frame_type})
   • 位位置: {config['start_bit']}-{config['start_bit']+config['length']-1}
   • 字节序: {'大端' if config['endian'] == 'big' else '小端'}
 

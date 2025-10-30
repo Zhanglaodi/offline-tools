@@ -82,34 +82,52 @@ class SimpleASCReader:
     def _parse_can_message(self, line: str, line_num: int) -> Dict[str, Any]:
         """
         解析CAN消息行
-        支持多种ASC格式
+        支持多种ASC格式，包括标准帧和扩展帧
         """
         # 格式1: 时间戳 通道 CAN_ID Rx/Tx d DLC 数据字节
         # 例: 0.000000 1  123             Rx   d 8 01 02 03 04 05 06 07 08
-        pattern1 = r'^\s*(\d+\.\d+)\s+(\d+)\s+([0-9A-Fa-f]+)\s+(Rx|Tx)\s+d\s+(\d+)\s+(.*)$'
+        # 扩展帧例: 0.000000 1  18FEF100x        Rx   d 8 01 02 03 04 05 06 07 08
+        pattern1 = r'^\s*(\d+\.\d+)\s+(\d+)\s+([0-9A-Fa-f]+)x?\s+(Rx|Tx)\s+d\s+(\d+)\s+(.*)$'
         
         # 格式2: 时间戳 通道 CAN_ID Rx/Tx DLC 数据字节
         # 例: 0.100000 1 123 Rx 8 AA BB CC DD EE FF 00 11
-        pattern2 = r'^\s*(\d+\.\d+)\s+(\d+)\s+([0-9A-Fa-f]+)\s+(Rx|Tx)\s+(\d+)\s+(.*)$'
+        # 扩展帧例: 0.100000 1 18FEF100x Rx 8 AA BB CC DD EE FF 00 11
+        pattern2 = r'^\s*(\d+\.\d+)\s+(\d+)\s+([0-9A-Fa-f]+)x?\s+(Rx|Tx)\s+(\d+)\s+(.*)$'
         
-        # 尝试匹配格式1
+        # 格式3: CANoe格式 - 扩展帧有特殊标记
+        # 例: 0.000000 1  18FEF100         Rx   d 8 01 02 03 04 05 06 07 08
+        pattern3 = r'^\s*(\d+\.\d+)\s+(\d+)\s+([0-9A-Fa-f]{8})\s+(Rx|Tx)\s+d\s+(\d+)\s+(.*)$'
+        
+        # 尝试匹配格式1（支持扩展帧x标记）
         match = re.match(pattern1, line, re.IGNORECASE)
         if match:
             timestamp, channel, can_id, direction, dlc, data_str = match.groups()
-            return self._create_message(timestamp, channel, can_id, direction, dlc, data_str, line_num)
+            is_extended = line.find(can_id + 'x') != -1 or len(can_id) > 3
+            return self._create_message(timestamp, channel, can_id, direction, dlc, data_str, line_num, is_extended)
         
-        # 尝试匹配格式2
+        # 尝试匹配格式2（支持扩展帧x标记）
         match = re.match(pattern2, line, re.IGNORECASE)
         if match:
             timestamp, channel, can_id, direction, dlc, data_str = match.groups()
-            return self._create_message(timestamp, channel, can_id, direction, dlc, data_str, line_num)
+            is_extended = line.find(can_id + 'x') != -1 or len(can_id) > 3
+            return self._create_message(timestamp, channel, can_id, direction, dlc, data_str, line_num, is_extended)
+        
+        # 尝试匹配格式3（8位十六进制通常是扩展帧）
+        match = re.match(pattern3, line, re.IGNORECASE)
+        if match:
+            timestamp, channel, can_id, direction, dlc, data_str = match.groups()
+            is_extended = True  # 8位十六进制默认为扩展帧
+            return self._create_message(timestamp, channel, can_id, direction, dlc, data_str, line_num, is_extended)
         
         return None
     
     def _create_message(self, timestamp: str, channel: str, can_id: str, 
-                       direction: str, dlc: str, data_str: str, line_num: int) -> Dict[str, Any]:
+                       direction: str, dlc: str, data_str: str, line_num: int, is_extended: bool = False) -> Dict[str, Any]:
         """创建消息字典"""
         try:
+            # 清理CAN ID（移除可能的x后缀）
+            clean_can_id = can_id.rstrip('x').rstrip('X')
+            
             # 解析数据字节
             data_bytes = []
             if data_str.strip():
@@ -121,11 +139,21 @@ class SimpleASCReader:
                         except ValueError:
                             break
             
+            # 转换CAN ID为整数
+            can_id_int = int(clean_can_id, 16)
+            
+            # 自动检测扩展帧（如果没有明确指定）
+            if not is_extended:
+                # 如果CAN ID > 0x7FF (2047)，则认为是扩展帧
+                is_extended = can_id_int > 0x7FF or len(clean_can_id) > 3
+            
             return {
                 'timestamp': float(timestamp),
                 'channel': int(channel),
-                'can_id': int(can_id, 16),  # 转换为十进制
-                'can_id_hex': can_id.upper(),
+                'can_id': can_id_int,  # 转换为十进制
+                'can_id_hex': clean_can_id.upper(),
+                'is_extended': is_extended,
+                'frame_type': 'Extended' if is_extended else 'Standard',
                 'direction': direction,
                 'dlc': int(dlc),
                 'data': data_bytes,
