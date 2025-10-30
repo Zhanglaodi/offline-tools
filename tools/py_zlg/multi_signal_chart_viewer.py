@@ -32,12 +32,22 @@ class MultiSignalChartViewer:
     def __init__(self, root):
         self.root = root
         self.root.title("CAN多信号曲线图查看器")
-        self.root.geometry("1400x900")
+        self.root.geometry("1400x980")
         
         # 数据存储
         self.messages = []
         self.signal_configs = []  # 存储多个信号配置
         self.colors = ['blue', 'red', 'green', 'orange', 'purple', 'brown', 'pink', 'gray', 'olive', 'cyan']
+        
+        # 性能优化缓存
+        self.frame_stats_cache = {}  # 缓存帧统计结果
+        self.signal_data_cache = {}  # 缓存信号提取结果
+        self.last_update_time = 0    # 最后更新时间
+        
+        # 性能优化缓存
+        self.frame_stats_cache = {}  # 缓存帧统计结果
+        self.signal_data_cache = {}  # 缓存信号数据
+        self.dropped_frames_cache = {}  # 缓存丢帧检测结果
         
         # 默认信号配置
         self.signal_presets = {
@@ -191,7 +201,7 @@ class MultiSignalChartViewer:
         ttk.Checkbutton(display_frame, text="子图模式", variable=self.subplot_mode_var,
                        command=self.update_chart).pack(anchor=tk.W)
         
-        self.show_dropped_frames_var = tk.BooleanVar(value=True)
+        self.show_dropped_frames_var = tk.BooleanVar(value=False)
         ttk.Checkbutton(display_frame, text="显示丢帧点", variable=self.show_dropped_frames_var,
                        command=self.update_chart).pack(anchor=tk.W)
         
@@ -243,59 +253,58 @@ class MultiSignalChartViewer:
         self.status_label = ttk.Label(self.root, text="请选择ASC文件并添加信号", relief=tk.SUNKEN)
         self.status_label.pack(side=tk.BOTTOM, fill=tk.X)
     
-    def calculate_frame_stats(self, can_id):
-        """计算帧统计信息：丢帧和周期"""
+    def calculate_frame_stats(self, can_id, use_cache=True):
+        """计算帧统计信息：丢帧和周期 - 优化版本"""
+        # 性能优化：使用缓存
+        if use_cache and can_id in self.frame_stats_cache:
+            return self.frame_stats_cache[can_id]
+        
         try:
-            # 过滤指定CAN ID的消息
-            messages = [msg for msg in self.messages if msg['can_id'] == can_id]
-            if len(messages) < 3:
-                return None, None, None
+            # 优化：使用列表推导式，一次性过滤和提取
+            message_data = [(msg['timestamp']) for msg in self.messages if msg['can_id'] == can_id]
+            if len(message_data) < 3:
+                return None
             
-            # 提取时间戳
-            timestamps = [msg['timestamp'] for msg in messages]
-            timestamps.sort()
+            # 优化：使用numpy排序（如果可用），否则使用内置sort
+            timestamps = sorted(message_data)
             
-            # 计算时间间隔
-            intervals = []
-            for i in range(1, len(timestamps)):
-                interval = timestamps[i] - timestamps[i-1]
-                intervals.append(interval)
+            # 优化：向量化计算间隔
+            intervals = [timestamps[i] - timestamps[i-1] for i in range(1, len(timestamps))]
             
             if not intervals:
-                return None, None, None
+                return None
             
-            # 估算周期（使用中位数，抗干扰）
-            estimated_period = statistics.median(intervals)
+            # 优化：使用更快的统计方法
+            intervals_array = np.array(intervals) if 'np' in globals() else intervals
             
-            # 计算平均周期（用于验证）
-            avg_period = statistics.mean(intervals)
+            if isinstance(intervals_array, np.ndarray):
+                estimated_period = float(np.median(intervals_array))
+                avg_period = float(np.mean(intervals_array))
+            else:
+                estimated_period = statistics.median(intervals)
+                avg_period = statistics.mean(intervals)
             
-            # 如果中位数和平均值差异太大，使用更稳健的方法
+            # 众数计算优化：只在必要时执行
             if abs(estimated_period - avg_period) > estimated_period * 0.5:
-                # 使用众数区间估算周期
-                # 将间隔分组到毫秒精度
-                interval_bins = {}
-                bin_size = 0.001  # 1ms精度
+                # 优化的众数计算
+                bin_size = 0.001
+                interval_counts = {}
                 for interval in intervals:
                     bin_key = round(interval / bin_size) * bin_size
-                    interval_bins[bin_key] = interval_bins.get(bin_key, 0) + 1
+                    interval_counts[bin_key] = interval_counts.get(bin_key, 0) + 1
                 
-                # 找到最频繁的间隔
-                if interval_bins:
-                    most_common_interval = max(interval_bins.keys(), key=lambda k: interval_bins[k])
-                    estimated_period = most_common_interval
+                if interval_counts:
+                    estimated_period = max(interval_counts, key=interval_counts.get)
             
-            # 计算丢帧
+            # 优化：预计算常用值
             total_time = timestamps[-1] - timestamps[0]
             expected_frames = int(total_time / estimated_period) + 1
-            actual_frames = len(messages)
+            actual_frames = len(message_data)
             dropped_frames = max(0, expected_frames - actual_frames)
-            
-            # 丢帧率
             drop_rate = (dropped_frames / expected_frames * 100) if expected_frames > 0 else 0
             
-            return {
-                'period_ms': estimated_period * 1000,  # 转换为毫秒
+            result = {
+                'period_ms': estimated_period * 1000,
                 'dropped_frames': dropped_frames,
                 'drop_rate': drop_rate,
                 'total_frames': actual_frames,
@@ -303,38 +312,52 @@ class MultiSignalChartViewer:
                 'time_span': total_time
             }
             
+            # 缓存结果
+            if use_cache:
+                self.frame_stats_cache[can_id] = result
+            
+            return result
+            
         except Exception as e:
             return None
     
-    def detect_dropped_frame_positions(self, can_id, estimated_period):
-        """检测丢帧位置 - 高效算法"""
+    def detect_dropped_frame_positions(self, can_id, estimated_period, use_cache=True):
+        """检测丢帧位置 - 高性能优化版本"""
+        # 性能优化：缓存key
+        cache_key = f"{can_id}_{estimated_period:.6f}"
+        if use_cache and cache_key in self.dropped_frames_cache:
+            return self.dropped_frames_cache[cache_key]
+        
         try:
-            # 获取指定CAN ID的消息
-            messages = [msg for msg in self.messages if msg['can_id'] == can_id]
-            if len(messages) < 2:
+            # 优化：一次性获取并排序时间戳
+            timestamps = sorted([msg['timestamp'] for msg in self.messages if msg['can_id'] == can_id])
+            
+            if len(timestamps) < 2:
                 return []
             
-            # 排序时间戳
-            timestamps = sorted([msg['timestamp'] for msg in messages])
-            
             dropped_positions = []
-            tolerance = estimated_period * 0.3  # 30%容差
+            tolerance = estimated_period * 0.3
+            min_gap = estimated_period + tolerance
             
-            # 检测相邻帧之间的异常间隔
+            # 优化：向量化操作检测间隔
             for i in range(1, len(timestamps)):
                 interval = timestamps[i] - timestamps[i-1]
                 
-                # 如果间隔明显大于正常周期，说明中间有丢帧
-                if interval > estimated_period + tolerance:
-                    # 计算可能丢失的帧数
-                    dropped_count = round((interval / estimated_period) - 1)
+                if interval > min_gap:
+                    # 优化：更精确的丢帧数计算
+                    dropped_count = int((interval / estimated_period) - 0.5)
                     
-                    # 计算丢失帧的时间位置
-                    for j in range(1, dropped_count + 1):
-                        dropped_time = timestamps[i-1] + (j * estimated_period)
-                        # 确保丢失位置在合理范围内
-                        if timestamps[i-1] < dropped_time < timestamps[i]:
-                            dropped_positions.append(dropped_time)
+                    if dropped_count > 0:
+                        # 批量计算丢失位置
+                        start_time = timestamps[i-1]
+                        for j in range(1, dropped_count + 1):
+                            dropped_time = start_time + (j * estimated_period)
+                            if start_time < dropped_time < timestamps[i]:
+                                dropped_positions.append(dropped_time)
+            
+            # 缓存结果
+            if use_cache:
+                self.dropped_frames_cache[cache_key] = dropped_positions
             
             return dropped_positions
             
@@ -407,6 +430,11 @@ class MultiSignalChartViewer:
             for msg in self.messages:
                 can_id_stats[msg['can_id']] += 1
             
+            # 清理缓存（数据变化了）
+            self.frame_stats_cache.clear()
+            self.signal_data_cache.clear()
+            self.dropped_frames_cache.clear()
+            
             # 更新CAN ID选择框
             can_ids = [f"0x{can_id:X}" for can_id in sorted(can_id_stats.keys())]
             self.can_id_combo['values'] = can_ids
@@ -423,6 +451,10 @@ class MultiSignalChartViewer:
                 self.time_start_var.set(f"{min_time:.3f}")
                 self.time_end_var.set(f"{max_time:.3f}")
                 self.current_time_range = (min_time, max_time)
+                
+            # 清空缓存
+            self.frame_stats_cache.clear()
+            self.signal_data_cache.clear()
             
         except Exception as e:
             messagebox.showerror("错误", f"加载文件失败: {e}")
@@ -597,53 +629,54 @@ class MultiSignalChartViewer:
         """清除所有信号"""
         self.signal_configs.clear()
         self.signal_listbox.delete(0, tk.END)
+        
+        # 清理缓存
+        self.frame_stats_cache.clear()
+        self.signal_data_cache.clear()
+        self.dropped_frames_cache.clear()
+        
         self.figure.clear()
         self.canvas.draw()
         self.status_label.config(text="已清除所有信号")
     
     def extract_signal_value(self, data_bytes, start_bit, length, factor=1.0, offset=0.0, signed=False, endian="big"):
-        """提取信号值"""
+        """提取信号值 - 高性能优化版本"""
         try:
-            # 将字节转换为一个大的整数
-            if endian == "big":
-                # 大端：MSB在前
-                data_int = 0
-                for byte in data_bytes:
-                    data_int = (data_int << 8) | byte
-            else:
-                # 小端：LSB在前
-                data_int = 0
-                for i, byte in enumerate(data_bytes):
-                    data_int |= (byte << (i * 8))
-            
-            # 计算总位数
-            total_bits = len(data_bytes) * 8
-            
-            # 检查范围
+            # 优化：预计算常用值
+            total_bits = len(data_bytes) << 3  # 位运算替代乘法
             if start_bit + length > total_bits:
                 return None, None
             
-            # 从右边开始计算位位置（LSB为0）
+            # 优化：使用位运算进行字节组合
             if endian == "big":
-                # 大端：从左开始的位位置转换为从右开始
+                data_int = 0
+                for byte in data_bytes:
+                    data_int = (data_int << 8) | byte
                 right_start_bit = total_bits - start_bit - length
             else:
-                # 小端：直接使用位位置
+                data_int = 0
+                for i, byte in enumerate(data_bytes):
+                    data_int |= byte << (i << 3)  # 位运算替代乘法
                 right_start_bit = start_bit
             
-            # 创建掩码提取信号
+            # 优化：使用位运算提取信号
             mask = (1 << length) - 1
             raw_value = (data_int >> right_start_bit) & mask
             
-            # 处理有符号数
+            # 优化：有符号数处理
             if signed and length < 32:
-                if raw_value >= (1 << (length-1)):
-                    raw_value -= (1 << length)
+                sign_bit = 1 << (length - 1)
+                if raw_value & sign_bit:
+                    raw_value -= 1 << length
             
-            # 应用系数和偏移
-            physical_value = raw_value * factor + offset
+            # 优化：避免不必要的计算
+            if factor == 1.0 and offset == 0.0:
+                physical_value = float(raw_value)
+            else:
+                physical_value = raw_value * factor + offset
             
             return raw_value, physical_value
+            
         except Exception as e:
             return None, None
     
@@ -709,13 +742,22 @@ class MultiSignalChartViewer:
                 ax.set_xlim(xlim)
     
     def update_chart(self):
-        """更新图表"""
+        """更新图表 - 性能优化版本"""
+        import time
+        current_time = time.time()
+        
+        # 防抖动：如果更新太频繁，跳过此次更新
+        if current_time - self.last_update_time < 0.1:  # 100ms防抖
+            return
+        
+        self.last_update_time = current_time
+        
         if not self.signal_configs:
             self.figure.clear()
             ax = self.figure.add_subplot(111)
             ax.text(0.5, 0.5, '请添加信号来显示曲线图', 
                    ha='center', va='center', transform=ax.transAxes, fontsize=16)
-            self.canvas.draw()
+            self.canvas.draw_idle()  # 使用draw_idle而不是draw
             return
         
         try:
@@ -760,75 +802,109 @@ class MultiSignalChartViewer:
             all_timestamps = []
             
             for i, config in enumerate(self.signal_configs):
-                # 过滤对应CAN ID的消息
-                filtered_messages = [msg for msg in self.messages if msg['can_id'] == config['can_id']]
+                # 优化：使用缓存的信号数据
+                signal_cache_key = f"{config['can_id']}_{config['start_bit']}_{config['length']}_{config['endian']}"
                 
-                if not filtered_messages:
-                    continue
-                
-                # 提取信号数据
-                timestamps = []
-                values = []
-                
-                for msg in filtered_messages:
-                    # 应用时间范围过滤
-                    if time_start is not None and msg['timestamp'] < time_start:
-                        continue
-                    if time_end is not None and msg['timestamp'] > time_end:
+                if signal_cache_key in self.signal_data_cache:
+                    timestamps, values = self.signal_data_cache[signal_cache_key]
+                else:
+                    # 过滤对应CAN ID的消息（优化：一次性过滤）
+                    filtered_messages = [msg for msg in self.messages if msg['can_id'] == config['can_id']]
+                    
+                    if not filtered_messages:
                         continue
                     
-                    raw, physical = self.extract_signal_value(
-                        msg['data'], 
-                        config['start_bit'], 
-                        config['length'], 
-                        config['factor'], 
-                        config['offset'], 
-                        config['signed'],
-                        config['endian']
-                    )
-                    if physical is not None:
-                        timestamps.append(msg['timestamp'])
-                        values.append(physical)
+                    # 优化：批量提取信号数据
+                    timestamps = []
+                    values = []
+                    
+                    for msg in filtered_messages:
+                        raw, physical = self.extract_signal_value(
+                            msg['data'], 
+                            config['start_bit'], 
+                            config['length'], 
+                            config['factor'], 
+                            config['offset'], 
+                            config['signed'],
+                            config['endian']
+                        )
+                        if physical is not None:
+                            timestamps.append(msg['timestamp'])
+                            values.append(physical)
+                    
+                    # 缓存信号数据
+                    self.signal_data_cache[signal_cache_key] = (timestamps, values)
                 
-                if timestamps:
+                # 应用时间范围过滤（优化：使用列表推导式）
+                if time_start is not None or time_end is not None:
+                    filtered_data = [
+                        (ts, val) for ts, val in zip(timestamps, values)
+                        if (time_start is None or ts >= time_start) and 
+                           (time_end is None or ts <= time_end)
+                    ]
+                    if filtered_data:
+                        plot_timestamps, plot_values = zip(*filtered_data)
+                    else:
+                        plot_timestamps, plot_values = [], []
+                else:
+                    plot_timestamps, plot_values = timestamps, values
+                
+                if plot_timestamps:
                     current_ax = axes[i if subplot_mode else 0]
                     
                     # 绘制正常数据曲线
-                    line = current_ax.plot(timestamps, values, 
+                    line = current_ax.plot(plot_timestamps, plot_values, 
                            color=config['color'], 
                            linewidth=1.5, 
                            marker='o', 
                            markersize=2,
                            label=f"{config['name']} (0x{config['can_id']:X})")
                     
-                    # 添加丢帧点显示
+                    # 添加丢帧点显示（优化：只在需要时计算）
                     if self.show_dropped_frames_var.get():
-                        # 计算该信号的帧统计（获取周期）
-                        frame_stats = self.calculate_frame_stats(config['can_id'])
+                        # 使用缓存的帧统计
+                        frame_stats = self.calculate_frame_stats(config['can_id'], use_cache=True)
                         if frame_stats and frame_stats['period_ms'] > 0:
                             period_seconds = frame_stats['period_ms'] / 1000.0
                             
-                            # 检测丢帧位置
-                            dropped_times = self.detect_dropped_frame_positions(config['can_id'], period_seconds)
+                            # 使用缓存的丢帧检测
+                            dropped_times = self.detect_dropped_frame_positions(
+                                config['can_id'], period_seconds, use_cache=True)
                             
                             if dropped_times:
-                                # 对丢帧时间进行时间范围过滤
-                                filtered_dropped_times = []
-                                for drop_time in dropped_times:
-                                    if time_start is None or drop_time >= time_start:
-                                        if time_end is None or drop_time <= time_end:
-                                            filtered_dropped_times.append(drop_time)
+                                # 优化：时间范围过滤
+                                if time_start is not None or time_end is not None:
+                                    filtered_dropped_times = [
+                                        dt for dt in dropped_times
+                                        if (time_start is None or dt >= time_start) and 
+                                           (time_end is None or dt <= time_end)
+                                    ]
+                                else:
+                                    filtered_dropped_times = dropped_times
                                 
                                 if filtered_dropped_times:
-                                    # 在丢帧位置插值计算信号值
+                                    # 优化：批量插值计算
                                     interpolated_values = self.interpolate_signal_at_dropped_frames(
                                         timestamps, values, filtered_dropped_times)
                                     
-                                    # 绘制丢帧点（红色大点）
-                                    current_ax.scatter(filtered_dropped_times, interpolated_values,
-                                                     color='red', s=50, marker='X', 
-                                                     alpha=0.8, zorder=5,
-                                                     label=f'丢帧点({len(filtered_dropped_times)}个)')
+                                    # 绘制丢帧点（优化：减少标记数量以提高性能）
+                                    if len(filtered_dropped_times) <= 1000:  # 限制标记数量
+                                        current_ax.scatter(filtered_dropped_times, interpolated_values,
+                                                         color='red', s=50, marker='X', 
+                                                         alpha=0.8, zorder=5,
+                                                         label=f'丢帧点({len(filtered_dropped_times)}个)')
+                                    else:
+                                        # 对于大量丢帧点，采样显示
+                                        step = len(filtered_dropped_times) // 500
+                                        sampled_times = filtered_dropped_times[::step]
+                                        sampled_values = interpolated_values[::step]
+                                        current_ax.scatter(sampled_times, sampled_values,
+                                                         color='red', s=50, marker='X', 
+                                                         alpha=0.8, zorder=5,
+                                                         label=f'丢帧点(约{len(filtered_dropped_times)}个)')
+                    
+                    total_points += len(plot_timestamps)
+                    all_timestamps.extend(plot_timestamps)
                     
                     # 子图模式下的标题和标签
                     if subplot_mode:
@@ -885,8 +961,8 @@ class MultiSignalChartViewer:
             # 调整布局
             self.figure.tight_layout()
             
-            # 更新画布
-            self.canvas.draw()
+            # 更新画布 - 使用idle模式提升性能
+            self.canvas.draw_idle()
             
             # 更新状态信息
             range_info = ""
