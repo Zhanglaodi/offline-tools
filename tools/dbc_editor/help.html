@@ -1,0 +1,530 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta http-equiv="x-ua-compatible" content="IE=edge">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>DBC Editor 使用帮助</title>
+  <link href="./css/bootstrap.min.css" rel="stylesheet">
+  <link rel="stylesheet" href="./css/styles.css">
+  <style>
+    /* 帮助页面专用样式 */
+    .help-page {
+      background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+      min-height: 100vh;
+      padding: 2rem 0;
+    }
+    .help-container {
+      background: white;
+      border-radius: 15px;
+      box-shadow: 0 10px 30px rgba(0,0,0,0.1);
+      overflow: hidden;
+    }
+    .help-header {
+      background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+      color: white;
+      padding: 2rem;
+      text-align: center;
+    }
+    .help-nav {
+      background: #f8f9fa;
+      border-right: 1px solid #dee2e6;
+      min-height: 600px;
+    }
+    .help-nav .nav-link {
+      color: #495057;
+      border-radius: 0;
+      padding: 0.75rem 1.5rem;
+      border-left: 4px solid transparent;
+      transition: all 0.3s ease;
+    }
+    .help-nav .nav-link:hover {
+      background-color: #e9ecef;
+      border-left-color: #6c757d;
+    }
+    .help-nav .nav-link.active {
+      background-color: #007bff;
+      color: white;
+      border-left-color: #0056b3;
+    }
+    .help-content {
+      padding: 2rem;
+      max-height: 80vh;
+      overflow-y: auto;
+    }
+    .code-block {
+      background: #f8f9fa;
+      border: 1px solid #dee2e6;
+      border-radius: 0.375rem;
+      padding: 1rem;
+      margin: 0.5rem 0;
+      position: relative;
+    }
+    .code-block pre {
+      margin: 0;
+      font-size: 0.875rem;
+      line-height: 1.4;
+    }
+    .code-block code {
+      background: transparent;
+      padding: 0;
+      font-size: inherit;
+    }
+    .copy-code-btn {
+      position: absolute;
+      top: 10px;
+      right: 10px;
+      font-size: 12px;
+      padding: 2px 8px;
+      opacity: 0;
+      transition: opacity 0.3s ease;
+    }
+    .code-block:hover .copy-code-btn {
+      opacity: 1;
+    }
+    .copy-code-btn:hover {
+      background-color: #6c757d;
+      border-color: #6c757d;
+      color: white;
+    }
+    .alert {
+      border-left: 4px solid;
+      padding-left: 1rem;
+    }
+    .alert-info { border-left-color: #0dcaf0; }
+    .alert-success { border-left-color: #198754; }
+    .alert-warning { border-left-color: #ffc107; }
+    kbd {
+      background-color: #495057;
+      color: #fff;
+      padding: 0.2rem 0.4rem;
+      border-radius: 0.25rem;
+      font-size: 0.75rem;
+    }
+    .back-btn {
+      position: fixed;
+      top: 20px;
+      left: 20px;
+      z-index: 1000;
+    }
+  </style>
+</head>
+<body class="help-page">
+  <a href="index.html" class="btn btn-light back-btn">
+    ← 返回编辑器
+  </a>
+
+  <div class="container-fluid">
+    <div class="help-container">
+      <div class="help-header">
+        <h1>📚 DBC Editor 使用帮助</h1>
+        <p class="mb-0">完整的 DBC 文件编辑器使用指南</p>
+      </div>
+      
+      <div class="row g-0">
+        <div class="col-lg-3 help-nav">
+          <div class="nav flex-column nav-pills p-3" id="help-tabs" role="tablist" aria-orientation="vertical">
+            <button class="nav-link active" id="overview-tab" data-bs-toggle="pill" data-bs-target="#overview" type="button" role="tab">📖 概述</button>
+            <button class="nav-link" id="dbc-format-tab" data-bs-toggle="pill" data-bs-target="#dbc-format" type="button" role="tab">📄 DBC 格式</button>
+            <button class="nav-link" id="quick-start-tab" data-bs-toggle="pill" data-bs-target="#quick-start" type="button" role="tab">🚀 快速开始</button>
+            <button class="nav-link" id="features-tab" data-bs-toggle="pill" data-bs-target="#features" type="button" role="tab">⚙️ 功能说明</button>
+            <button class="nav-link" id="signal-layout-tab" data-bs-toggle="pill" data-bs-target="#signal-layout" type="button" role="tab">🔲 信号布局</button>
+            <button class="nav-link" id="examples-tab" data-bs-toggle="pill" data-bs-target="#examples" type="button" role="tab">💻 示例</button>
+            <button class="nav-link" id="faq-tab" data-bs-toggle="pill" data-bs-target="#faq" type="button" role="tab">❓ 常见问题</button>
+          </div>
+        </div>
+        
+        <div class="col-lg-9 help-content">
+          <div class="tab-content" id="help-content">
+            <!-- 概述 -->
+            <div class="tab-pane fade show active" id="overview" role="tabpanel">
+              <h3>ℹ️ 什么是 DBC Editor？</h3>
+              <p>DBC Editor 是一个轻量级的在线 DBC 文件编辑器，用于创建和编辑 CAN 总线数据库文件。</p>
+              
+              <h4>主要特性</h4>
+              <ul>
+                <li><strong>无需安装</strong>：基于浏览器的在线工具</li>
+                <li><strong>实时预览</strong>：所见即所得的编辑体验</li>
+                <li><strong>信号布局可视化</strong>：直观显示信号在 CAN 帧中的位置</li>
+                <li><strong>多编码支持</strong>：支持 UTF-8、GB18030 等编码格式</li>
+                <li><strong>值表管理</strong>：轻松管理信号的枚举值</li>
+                <li><strong>快捷操作</strong>：支持键盘快捷键和批量操作</li>
+              </ul>
+
+              <div class="alert alert-info">
+                💡 
+                <strong>提示：</strong>DBC（Database CAN）文件是 Vector 公司定义的 CAN 总线数据库格式，广泛应用于汽车电子、工业控制等领域。
+              </div>
+            </div>
+
+            <!-- DBC 格式 -->
+            <div class="tab-pane fade" id="dbc-format" role="tabpanel">
+              <h3>📄 DBC 文件格式说明</h3>
+              
+              <h4>基本结构</h4>
+              <div class="code-block">
+                <button class="btn btn-sm btn-outline-secondary copy-code-btn">📋 复制</button>
+                <pre><code>VERSION "1.0"
+
+NS_:
+  NS_DESC_ CM_ BA_DEF_ BA_ VAL_ ...
+
+BS_:
+
+BU_: ECU1 ECU2 Vector__XXX
+
+BO_ 256 EngineData: 8 ECU1
+ SG_ RPM : 0|16@1+ (1,0) [0|8000] "rpm" ECU2
+ SG_ Speed : 16|16@1+ (0.1,0) [0|250] "km/h" ECU2
+
+CM_ BO_ 256 "发动机数据帧";
+CM_ SG_ 256 RPM "发动机转速";
+
+VAL_TABLE_ OnOff 0 "Off" 1 "On" ;
+VAL_ 256 RPM 0 "Stop" 1000 "Idle" ;</code></pre>
+              </div>
+
+              <h4>关键字段说明</h4>
+              <div class="table-responsive">
+                <table class="table table-sm table-bordered">
+                  <thead class="table-light">
+                    <tr><th>字段</th><th>说明</th><th>示例</th></tr>
+                  </thead>
+                  <tbody>
+                    <tr><td><code>BO_</code></td><td>消息定义</td><td><code>BO_ 256 EngineData: 8 ECU1</code></td></tr>
+                    <tr><td><code>SG_</code></td><td>信号定义</td><td><code>SG_ RPM : 0|16@1+ (1,0) [0|8000] "rpm" ECU2</code></td></tr>
+                    <tr><td><code>CM_</code></td><td>注释</td><td><code>CM_ BO_ 256 "消息注释";</code></td></tr>
+                    <tr><td><code>VAL_TABLE_</code></td><td>值表定义</td><td><code>VAL_TABLE_ OnOff 0 "Off" 1 "On" ;</code></td></tr>
+                    <tr><td><code>VAL_</code></td><td>信号值定义</td><td><code>VAL_ 256 RPM 0 "Stop" ;</code></td></tr>
+                  </tbody>
+                </table>
+              </div>
+
+              <h4>信号格式详解</h4>
+              <p><code>SG_ 信号名 : 起始位|长度@字节序符号 (系数,偏移) [最小值|最大值] "单位" 接收节点</code></p>
+              <ul>
+                <li><strong>起始位</strong>：信号在 CAN 帧中的起始位置（0-63）</li>
+                <li><strong>长度</strong>：信号的位长度（1-64）</li>
+                <li><strong>字节序</strong>：1=小端（Intel），0=大端（Motorola）</li>
+                <li><strong>符号</strong>：+=无符号，-=有符号</li>
+                <li><strong>系数/偏移</strong>：物理值 = 原始值 × 系数 + 偏移</li>
+              </ul>
+            </div>
+
+            <!-- 快速开始 -->
+            <div class="tab-pane fade" id="quick-start" role="tabpanel">
+              <h3>🚀 快速开始</h3>
+              
+              <h4>创建新项目</h4>
+              <ol>
+                <li>点击 <span class="badge bg-primary">新建消息</span> 创建第一个 CAN 消息</li>
+                <li>设置消息的 CAN ID、名称、DLC（数据长度）</li>
+                <li>点击 <span class="badge bg-outline-primary">添加信号</span> 为消息添加信号</li>
+                <li>配置信号的起始位、长度、数据类型等参数</li>
+                <li>在右侧预览区域查看生成的 DBC 代码</li>
+                <li>点击 <span class="badge bg-success">导出 DBC</span> 下载文件</li>
+              </ol>
+
+              <h4>导入现有文件</h4>
+              <ol>
+                <li>选择合适的编码格式（自动检测/UTF-8/GB18030）</li>
+                <li>点击文件选择器，选择 .dbc 文件</li>
+                <li>系统会自动解析并显示消息和信号</li>
+                <li>可以继续编辑或导出为新文件</li>
+              </ol>
+
+              <div class="alert alert-success">
+                ⌨️
+                <strong>快捷键：</strong>
+                <ul class="mb-0 mt-2">
+                  <li><kbd>Ctrl</kbd> + <kbd>S</kbd> - 快速导出 DBC 文件</li>
+                  <li><kbd>Ctrl</kbd> + <kbd>H</kbd> - 打开帮助文档</li>
+                </ul>
+              </div>
+            </div>
+
+            <!-- 功能说明 -->
+            <div class="tab-pane fade" id="features" role="tabpanel">
+              <h3>⚙️ 功能详细说明</h3>
+              
+              <h4>消息管理</h4>
+              <ul>
+                <li><strong>新建消息</strong>：创建新的 CAN 消息，系统会自动分配递增的 CAN ID</li>
+                <li><strong>删除消息</strong>：删除选中的消息及其所有信号</li>
+                <li><strong>消息属性</strong>：
+                  <ul>
+                    <li>CAN ID：支持十进制和十六进制输入（0x前缀）</li>
+                    <li>DLC：数据长度码，范围 0-8 字节</li>
+                    <li>发送节点：指定消息的发送ECU</li>
+                    <li>扩展帧：支持标准帧（11位ID）和扩展帧（29位ID）</li>
+                  </ul>
+                </li>
+              </ul>
+
+              <h4>信号编辑</h4>
+              <ul>
+                <li><strong>添加信号</strong>：为当前消息添加新信号</li>
+                <li><strong>信号排序</strong>：使用上移/下移按钮调整信号顺序</li>
+                <li><strong>自动推算</strong>：根据信号长度和数据类型自动计算物理值范围</li>
+                <li><strong>字节序</strong>：
+                  <ul>
+                    <li>小端（Intel）：低字节在前，常用于 x86 架构</li>
+                    <li>大端（Motorola）：高字节在前，常用于网络协议</li>
+                  </ul>
+                </li>
+              </ul>
+
+              <h4>值表功能</h4>
+              <ul>
+                <li><strong>创建值表</strong>：为枚举类型信号定义数值-文本映射</li>
+                <li><strong>格式要求</strong>：每行一个映射，格式为 <code>数值 "文本描述"</code></li>
+                <li><strong>信号关联</strong>：在信号编辑时选择对应的值表</li>
+              </ul>
+
+              <h4>节点管理</h4>
+              <ul>
+                <li><strong>添加节点</strong>：在输入框中输入节点名，按回车添加</li>
+                <li><strong>自动添加</strong>：设置消息发送节点时会自动添加到节点列表</li>
+              </ul>
+            </div>
+
+            <!-- 信号布局 -->
+            <div class="tab-pane fade" id="signal-layout" role="tabpanel">
+              <h3>🔲 信号布局可视化</h3>
+              
+              <p>点击 <span class="badge bg-outline-secondary">layout</span> 按钮可以查看信号在 CAN 帧中的布局。</p>
+
+              <h4>布局图说明</h4>
+              <ul>
+                <li><strong>横轴</strong>：位索引（7-0），从左到右表示字节内的位位置</li>
+                <li><strong>纵轴</strong>：字节索引（0-DLC），从上到下表示 CAN 帧中的字节位置</li>
+                <li><strong>彩色块</strong>：不同颜色代表不同的信号</li>
+                <li><strong>红色三角</strong>：标记信号的 MSB（最高有效位）和 LSB（最低有效位）</li>
+              </ul>
+
+              <h4>字节序示例</h4>
+              <div class="row">
+                <div class="col-md-6">
+                  <h5>小端（Intel）</h5>
+                  <p>16位信号从位置0开始：</p>
+                  <div class="code-block">
+                    <button class="btn btn-sm btn-outline-secondary copy-code-btn">📋 复制</button>
+                    <pre>位置: 7 6 5 4 3 2 1 0
+字节0: [S S S S S S S S] (位0-7)
+字节1: [S S S S S S S S] (位8-15)</pre>
+                  </div>
+                </div>
+                <div class="col-md-6">
+                  <h5>大端（Motorola）</h5>
+                  <p>16位信号从位置15开始：</p>
+                  <div class="code-block">
+                    <button class="btn btn-sm btn-outline-secondary copy-code-btn">📋 复制</button>
+                    <pre>位置: 7 6 5 4 3 2 1 0
+字节0: [S S S S S S S S] (位15-8)
+字节1: [S S S S S S S S] (位7-0)</pre>
+                  </div>
+                </div>
+              </div>
+
+              <div class="alert alert-warning">
+                ⚠️
+                <strong>注意：</strong>选择正确的字节序对于信号解析至关重要，错误的字节序会导致数据解析错误。
+              </div>
+            </div>
+
+            <!-- 示例 -->
+            <div class="tab-pane fade" id="examples" role="tabpanel">
+              <h3>💻 实用示例</h3>
+              
+              <h4>汽车发动机数据</h4>
+              <div class="code-block">
+                <button class="btn btn-sm btn-outline-secondary copy-code-btn">📋 复制</button>
+                <pre><code>BO_ 0x123 EngineData: 8 ECU
+ SG_ RPM : 0|16@1+ (1,0) [0|8000] "rpm" Dashboard
+ SG_ Speed : 16|16@1+ (0.1,0) [0|250] "km/h" Dashboard
+ SG_ Throttle : 32|8@1+ (0.4,0) [0|100] "%" Dashboard
+ SG_ EngineTemp : 40|8@1- (1,-40) [-40|150] "°C" Dashboard</code></pre>
+              </div>
+
+              <h4>开关状态信号</h4>
+              <div class="code-block">
+                <button class="btn btn-sm btn-outline-secondary copy-code-btn">📋 复制</button>
+                <pre><code>VAL_TABLE_ OnOff 0 "Off" 1 "On" ;
+VAL_TABLE_ GearPos 0 "P" 1 "R" 2 "N" 3 "D" ;
+
+BO_ 0x456 SwitchStatus: 8 BCM
+ SG_ HeadLight : 0|1@1+ (1,0) [0|1] "" Dashboard
+ SG_ TurnLeft : 1|1@1+ (1,0) [0|1] "" Dashboard  
+ SG_ TurnRight : 2|1@1+ (1,0) [0|1] "" Dashboard
+ SG_ GearPosition : 8|4@1+ (1,0) [0|15] "" Dashboard
+
+VAL_ 0x456 HeadLight 0 "Off" 1 "On" ;
+VAL_ 0x456 GearPosition 0 "P" 1 "R" 2 "N" 3 "D" ;</code></pre>
+              </div>
+
+              <h4>浮点数信号</h4>
+              <div class="code-block">
+                <button class="btn btn-sm btn-outline-secondary copy-code-btn">📋 复制</button>
+                <pre><code>BO_ 0x789 FloatData: 8 Sensor
+ SG_ Voltage : 0|16@1+ (0.001,0) [0|65.535] "V" ECU
+ SG_ Current : 16|16@1- (0.01,-327.68) [-327.68|327.67] "A" ECU
+ SG_ Power : 32|32@1+ (0.1,0) [0|4294967295] "W" ECU</code></pre>
+              </div>
+            </div>
+
+            <!-- 常见问题 -->
+            <div class="tab-pane fade" id="faq" role="tabpanel">
+              <h3>❓ 常见问题</h3>
+              
+              <div class="accordion" id="faqAccordion">
+                <div class="accordion-item">
+                  <h2 class="accordion-header" id="faq1">
+                    <button class="accordion-button collapsed" type="button" data-bs-toggle="collapse" data-bs-target="#faqCollapse1">
+                      如何设置正确的信号起始位置？
+                    </button>
+                  </h2>
+                  <div id="faqCollapse1" class="accordion-collapse collapse" data-bs-parent="#faqAccordion">
+                    <div class="accordion-body">
+                      <p>信号起始位置的计算方式取决于字节序：</p>
+                      <ul>
+                        <li><strong>小端（Intel）</strong>：起始位 = 字节索引 × 8 + 位索引</li>
+                        <li><strong>大端（Motorola）</strong>：起始位 = 信号最高位的绝对位置</li>
+                      </ul>
+                      <p>建议使用布局可视化功能来确认信号位置是否正确。</p>
+                    </div>
+                  </div>
+                </div>
+
+                <div class="accordion-item">
+                  <h2 class="accordion-header" id="faq2">
+                    <button class="accordion-button collapsed" type="button" data-bs-toggle="collapse" data-bs-target="#faqCollapse2">
+                      系数和偏移如何设置？
+                    </button>
+                  </h2>
+                  <div id="faqCollapse2" class="accordion-collapse collapse" data-bs-parent="#faqAccordion">
+                    <div class="accordion-body">
+                      <p>物理值的计算公式：<strong>物理值 = 原始值 × 系数 + 偏移</strong></p>
+                      <ul>
+                        <li><strong>系数</strong>：用于缩放，例如 0.1 表示原始值除以10</li>
+                        <li><strong>偏移</strong>：用于平移，例如 -40 表示减去40（温度传感器常用）</li>
+                      </ul>
+                      <p>点击"推算"按钮可以根据信号长度自动计算合理的取值范围。</p>
+                    </div>
+                  </div>
+                </div>
+
+                <div class="accordion-item">
+                  <h2 class="accordion-header" id="faq3">
+                    <button class="accordion-button collapsed" type="button" data-bs-toggle="collapse" data-bs-target="#faqCollapse3">
+                      导入文件时出现乱码怎么办？
+                    </button>
+                  </h2>
+                  <div id="faqCollapse3" class="accordion-collapse collapse" data-bs-parent="#faqAccordion">
+                    <div class="accordion-body">
+                      <p>尝试以下解决方案：</p>
+                      <ol>
+                        <li>将导入编码改为 "GB18030"（适用于中文 Windows 系统）</li>
+                        <li>确认原文件的编码格式，使用文本编辑器转换为 UTF-8</li>
+                        <li>如果仍有问题，可尝试将文件另存为 UTF-8 编码后重新导入</li>
+                      </ol>
+                    </div>
+                  </div>
+                </div>
+
+                <div class="accordion-item">
+                  <h2 class="accordion-header" id="faq4">
+                    <button class="accordion-button collapsed" type="button" data-bs-toggle="collapse" data-bs-target="#faqCollapse4">
+                      为什么信号布局显示重叠？
+                    </button>
+                  </h2>
+                  <div id="faqCollapse4" class="accordion-collapse collapse" data-bs-parent="#faqAccordion">
+                    <div class="accordion-body">
+                      <p>信号重叠通常是由以下原因造成的：</p>
+                      <ul>
+                        <li>多个信号使用了相同的起始位置</li>
+                        <li>信号长度设置过大，超出了 CAN 帧范围</li>
+                        <li>字节序设置错误导致位置计算错误</li>
+                      </ul>
+                      <p>请检查每个信号的起始位置和长度，确保它们不会相互重叠。</p>
+                    </div>
+                  </div>
+                </div>
+
+                <div class="accordion-item">
+                  <h2 class="accordion-header" id="faq5">
+                    <button class="accordion-button collapsed" type="button" data-bs-toggle="collapse" data-bs-target="#faqCollapse5">
+                      如何创建多字节的有符号信号？
+                    </button>
+                  </h2>
+                  <div id="faqCollapse5" class="accordion-collapse collapse" data-bs-parent="#faqAccordion">
+                    <div class="accordion-body">
+                      <p>对于有符号整数信号：</p>
+                      <ol>
+                        <li>将"符号"设置为"-"（有符号）</li>
+                        <li>设置适当的长度（8位、16位、32位等）</li>
+                        <li>点击"推算"按钮会自动计算有符号整数的取值范围</li>
+                        <li>根据需要调整系数和偏移来适应实际的物理值范围</li>
+                      </ol>
+                      <p>例如：16位有符号整数的原始值范围是 -32768 到 32767。</p>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <script src="./js/jquery.min.js"></script>
+  <script src="./js/bootstrap.min.js"></script>
+  <script>
+    // 代码复制功能
+    document.addEventListener('DOMContentLoaded', function() {
+      var codeBlocks = document.querySelectorAll('.code-block');
+      codeBlocks.forEach(function(block) {
+        var copyBtn = block.querySelector('.copy-code-btn');
+        if (copyBtn) {
+          copyBtn.addEventListener('click', function() {
+            var codeElement = block.querySelector('pre');
+            var textToCopy = codeElement.textContent;
+            
+            if (navigator.clipboard) {
+              navigator.clipboard.writeText(textToCopy).then(function() {
+                copyBtn.textContent = '✅ 已复制';
+                setTimeout(function() {
+                  copyBtn.textContent = '📋 复制';
+                }, 2000);
+              });
+            } else {
+              // 降级方案
+              var textArea = document.createElement('textarea');
+              textArea.value = textToCopy;
+              document.body.appendChild(textArea);
+              textArea.select();
+              try {
+                document.execCommand('copy');
+                copyBtn.textContent = '✅ 已复制';
+                setTimeout(function() {
+                  copyBtn.textContent = '📋 复制';
+                }, 2000);
+              } catch (err) {
+                console.log('复制失败');
+              }
+              document.body.removeChild(textArea);
+            }
+          });
+        }
+      });
+
+      // 快捷键支持
+      document.addEventListener('keydown', function(e) {
+        if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'escape') {
+          window.location.href = 'index.html';
+        }
+      });
+    });
+  </script>
+</body>
+</html>
