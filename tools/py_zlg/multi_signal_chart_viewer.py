@@ -603,19 +603,35 @@ class MultiSignalChartViewer:
         """显示关于信息"""
         about_window = tk.Toplevel(self.root)
         about_window.title("关于")
-        about_window.geometry("450x700")
-        about_window.resizable(False, False)
+        about_window.geometry("600x700")
+        about_window.resizable(True, True)
         
         # 主标题
         title_label = tk.Label(about_window, text="CAN多信号曲线图查看器", 
                               font=("Arial", 16, "bold"), fg="navy")
         title_label.pack(pady=20)
         
+        # 创建滚动文本框的容器
+        text_frame = ttk.Frame(about_window)
+        text_frame.pack(fill=tk.BOTH, expand=True, padx=20, pady=(0, 20))
+        
+        # 创建滚动条
+        scrollbar = ttk.Scrollbar(text_frame)
+        scrollbar.pack(side=tk.RIGHT, fill=tk.Y)
+        
+        # 创建文本框
+        text_widget = tk.Text(text_frame, wrap=tk.WORD, yscrollcommand=scrollbar.set, 
+                             font=("Arial", 10), padx=15, pady=15, 
+                             relief=tk.SUNKEN, borderwidth=2)
+        text_widget.pack(side=tk.LEFT, fill=tk.BOTH, expand=True)
+        
+        # 配置滚动条
+        scrollbar.config(command=text_widget.yview)
+        
         # 使用帮助管理器获取关于信息
         about_text = self.help_manager.get_about_info()
-        desc_label = tk.Label(about_window, text=about_text, font=("Arial", 10), 
-                             justify=tk.LEFT, wraplength=400)
-        desc_label.pack(pady=20, padx=20)
+        text_widget.insert(tk.END, about_text)
+        text_widget.config(state=tk.DISABLED)  # 设置为只读
         
         # 关闭按钮
         ttk.Button(about_window, text="关闭", command=about_window.destroy).pack(pady=10)
