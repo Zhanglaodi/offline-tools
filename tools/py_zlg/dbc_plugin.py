@@ -80,6 +80,15 @@ class DBCPlugin:
                                       foreground="blue", font=("Arial", 8))
         self.dbc_info_label.pack(side=tk.LEFT)
         
+        # 模式状态提示
+        status_frame = ttk.Frame(dbc_frame)
+        status_frame.pack(fill=tk.X, pady=(5, 0))
+        
+        self.mode_status_var = tk.StringVar(value="当前模式: 手动输入")
+        self.mode_status_label = ttk.Label(status_frame, textvariable=self.mode_status_var, 
+                                          foreground="darkgreen", font=("Arial", 9, "bold"))
+        self.mode_status_label.pack(side=tk.LEFT)
+        
         # 初始状态：隐藏DBC控件
         self.on_mode_changed()
         
@@ -95,6 +104,8 @@ class DBCPlugin:
             # 启用手动输入控件和添加按钮
             self.enable_manual_controls(True)
             self.enable_add_signal_button(True)
+            # 更新状态显示
+            self.mode_status_var.set("当前模式: 手动输入 ✏️")
             
         elif mode == "dbc":
             # 显示DBC控件
@@ -102,6 +113,11 @@ class DBCPlugin:
             # 禁用手动输入控件和添加按钮
             self.enable_manual_controls(False)
             self.enable_add_signal_button(False)
+            # 更新状态显示
+            if self.dbc_loaded:
+                self.mode_status_var.set("当前模式: DBC数据库 📊")
+            else:
+                self.mode_status_var.set("当前模式: DBC数据库 (未加载) ⚠️")
     
     def enable_add_signal_button(self, enabled: bool):
         """启用/禁用添加信号按钮"""
@@ -117,18 +133,36 @@ class DBCPlugin:
         try:
             # 控制手动输入区域的状态
             state = "normal" if enabled else "disabled"
+            combo_state = "readonly" if enabled else "disabled"
             
             # 直接控制主界面的输入控件
-            control_widgets = [
-                ('start_bit_var', '起始位'),
-                ('length_var', '长度'),
-                ('factor_var', '系数'), 
-                ('offset_var', '偏移'),
-                ('signal_name_var', '信号名称')
+            control_entries = [
+                ('start_bit_var', 'Entry'),
+                ('length_var', 'Entry'),
+                ('factor_var', 'Entry'), 
+                ('offset_var', 'Entry'),
+                ('signal_name_var', 'Entry')
             ]
             
-            # 遍历主界面查找相关控件
-            self._update_control_states(self.parent_app.root, state, enabled)
+            # 控制Entry控件
+            for var_name, widget_type in control_entries:
+                if hasattr(self.parent_app, var_name):
+                    self._find_and_control_entry(self.parent_app.root, 
+                                               getattr(self.parent_app, var_name), state)
+            
+            # 直接控制特定控件
+            # 控制CAN ID下拉框
+            if hasattr(self.parent_app, 'can_id_combo'):
+                self.parent_app.can_id_combo.config(state=combo_state)
+            
+            # 控制字节序下拉框
+            if hasattr(self.parent_app, 'endian_combo'):
+                self.parent_app.endian_combo.config(state=combo_state)
+            
+            # 控制有符号数复选框
+            if hasattr(self.parent_app, 'signed_var'):
+                self._find_and_control_checkbutton(self.parent_app.root, 
+                                                  self.parent_app.signed_var, state)
             
             # 更新说明文本
             if hasattr(self, 'dbc_info_var'):
@@ -146,50 +180,40 @@ class DBCPlugin:
         except Exception as e:
             print(f"设置手动控件状态失败: {e}")
     
-    def _update_control_states(self, widget, state, enabled):
-        """递归更新控件状态"""
+    def _find_and_control_entry(self, widget, target_var, state):
+        """查找并控制Entry控件"""
         try:
-            # 如果是Entry控件，检查是否需要控制
             if isinstance(widget, ttk.Entry):
                 try:
                     textvariable = widget.cget('textvariable')
-                    # 检查是否是信号配置相关的Entry
-                    target_vars = [
-                        str(self.parent_app.start_bit_var), 
-                        str(self.parent_app.length_var),
-                        str(self.parent_app.factor_var), 
-                        str(self.parent_app.offset_var),
-                        str(self.parent_app.signal_name_var)
-                    ]
-                    
-                    if textvariable in target_vars:
+                    if textvariable == str(target_var):
                         widget.config(state=state)
-                        # 不改变前景色，保持默认样式
-                        
-                except (tk.TclError, AttributeError):
-                    pass
-            
-            # 控制Checkbutton (有符号数选择)
-            elif isinstance(widget, ttk.Checkbutton):
-                try:
-                    variable = widget.cget('variable')
-                    if variable == str(self.parent_app.signed_var):
-                        widget.config(state=state)
-                except (tk.TclError, AttributeError):
-                    pass
-            
-            # 控制Combobox (字节序选择)
-            elif isinstance(widget, ttk.Combobox):
-                try:
-                    textvariable = widget.cget('textvariable')
-                    if textvariable == str(self.parent_app.endian_var):
-                        widget.config(state="readonly" if enabled else "disabled")
+                        return
                 except (tk.TclError, AttributeError):
                     pass
             
             # 递归处理子控件
             for child in widget.winfo_children():
-                self._update_control_states(child, state, enabled)
+                self._find_and_control_entry(child, target_var, state)
+                
+        except Exception:
+            pass
+    
+    def _find_and_control_checkbutton(self, widget, target_var, state):
+        """查找并控制Checkbutton控件"""
+        try:
+            if isinstance(widget, ttk.Checkbutton):
+                try:
+                    variable = widget.cget('variable')
+                    if variable == str(target_var):
+                        widget.config(state=state)
+                        return
+                except (tk.TclError, AttributeError):
+                    pass
+            
+            # 递归处理子控件
+            for child in widget.winfo_children():
+                self._find_and_control_checkbutton(child, target_var, state)
                 
         except Exception:
             pass
@@ -224,6 +248,10 @@ class DBCPlugin:
                 # 更新信息显示
                 total_signals = sum(len(msg.signals) for msg in self.dbc_parser.messages)
                 self.dbc_info_var.set(f"已加载: {len(self.dbc_parser.messages)}个消息, {total_signals}个信号")
+                
+                # 更新模式状态显示
+                if self.config_mode_var.get() == "dbc":
+                    self.mode_status_var.set("当前模式: DBC数据库 📊")
                 
                 messagebox.showinfo("成功", f"DBC文件加载成功!\n消息数: {len(self.dbc_parser.messages)}\n信号数: {total_signals}")
                 

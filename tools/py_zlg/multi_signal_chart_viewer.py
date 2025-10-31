@@ -228,9 +228,9 @@ class MultiSignalChartViewer:
         endian_frame.pack(fill=tk.X, pady=2)
         ttk.Label(endian_frame, text="字节序:", width=8).pack(side=tk.LEFT)
         self.endian_var = tk.StringVar(value="little")
-        endian_combo = ttk.Combobox(endian_frame, textvariable=self.endian_var, 
+        self.endian_combo = ttk.Combobox(endian_frame, textvariable=self.endian_var, 
                                    values=["big", "little"], state="readonly", width=8)
-        endian_combo.pack(side=tk.RIGHT)
+        self.endian_combo.pack(side=tk.RIGHT)
         
         # 字节序说明
         endian_info = ttk.Label(add_frame, text="big=大端(Motorola), little=小端(Intel)", 
