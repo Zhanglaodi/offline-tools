@@ -42,7 +42,7 @@ class LinksHub {
             { id: this.generateId(), title: 'CRC-校验', url: './tools/CRC-校验/index.html', desc: '支持自定义多项式，支持多种CRC校验', tags: ['工具', 'CRC校验'], kind: 'LOCAL', online: true, favorited: false },
             { id: this.generateId(), title: 'BCC-校验', url: './tools/BCC校验/index.html', desc: '支持BCC校验', tags: ['工具', 'BCC校验'], kind: 'LOCAL', online: true, favorited: false },
             { id: this.generateId(), title: 'STM32 文档 (F4 HAL)', url: 'https://www.st.com/en/embedded-software/stm32cube-mcu-packages.html', desc: 'F4 HAL 参考与例程入口。', tags: ['STM32', 'HAL', '文档'], kind: 'WEB', online: true, favorited: false },
-            { id: this.generateId(), title: 'asc曲线工具(独立运行版)', url: 'https://pan.baidu.com/s/5iUl1EJqsuVKNUqp-m0dtJg', desc: 'asc文件曲线工具', tags: ['zlg', '曲线', '汽车'], kind: 'WEB', online: true, favorited: false }
+            { id: this.generateId(), title: 'ASC曲线工具(独立运行版)', url: 'https://pan.baidu.com/s/5iUl1EJqsuVKNUqp-m0dtJg', desc: 'asc文件曲线工具', tags: ['zlg', '曲线', '汽车'], kind: 'WEB', online: true, favorited: false }
         ];
 
         // 添加创建时间和更新时间
