@@ -374,6 +374,7 @@
         btnExport: document.getElementById('btnExport'),
         selExportEnc: document.getElementById('selExportEnc'),
         btnToggleDensity: document.getElementById('btnToggleDensity'),
+        btnToggleSidebar: document.getElementById('btnToggleSidebar'),
         // msg fields
         mCanId: document.getElementById('mCanId'),
         mName: document.getElementById('mName'),
@@ -772,6 +773,17 @@
                 var compact = document.body.classList.contains('compact');
                 els.btnToggleDensity.textContent = compact ? '标准模式' : '紧凑模式';
                 try { localStorage.setItem('dbc-density', compact ? 'compact' : 'normal'); } catch (_) { }
+            });
+
+            // 侧边栏切换功能
+            var sidebarSaved = localStorage.getItem('dbc-sidebar') || 'visible';
+            if (sidebarSaved === 'hidden') document.body.classList.add('sidebar-hidden');
+            els.btnToggleSidebar.textContent = document.body.classList.contains('sidebar-hidden') ? '📌 显示侧栏' : '📌 隐藏侧栏';
+            els.btnToggleSidebar.addEventListener('click', function () {
+                document.body.classList.toggle('sidebar-hidden');
+                var hidden = document.body.classList.contains('sidebar-hidden');
+                els.btnToggleSidebar.textContent = hidden ? '📌 显示侧栏' : '📌 隐藏侧栏';
+                try { localStorage.setItem('dbc-sidebar', hidden ? 'hidden' : 'visible'); } catch (_) { }
             });
         } catch (_) { }
     })();

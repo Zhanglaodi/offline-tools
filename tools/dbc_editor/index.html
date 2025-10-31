@@ -36,6 +36,7 @@
         <button id="btnExport" class="btn btn-success btn-sm">导出 DBC</button>
       </div>
       <button id="btnToggleDensity" class="btn btn-outline-secondary btn-sm">紧凑模式</button>
+      <button id="btnToggleSidebar" class="btn btn-outline-secondary btn-sm">📌 侧栏</button>
       <a href="help.html" target="_blank" class="btn btn-outline-info btn-sm">❓ 帮助</a>
     </div>
   </div>
@@ -43,7 +44,7 @@
 
 <div class="container-fluid py-3">
   <div class="row g-3">
-    <div class="col-12 col-lg-3 col-xl-2">
+    <div class="col-12 col-lg-3 col-xl-2" id="sidebarColumn">
       <div class="sticky-sidebar">
         <div class="card mb-3">
           <div class="card-header py-2">节点 (BU_)</div>
@@ -71,7 +72,7 @@
         </div>
       </div>
     </div>
-    <div class="col-12 col-lg-9 col-xl-10">
+    <div class="col-12 col-lg-9 col-xl-10" id="mainContentColumn">
       <div class="card mb-3">
         <div class="card-header py-2">项目信息</div>
         <div class="card-body">
@@ -95,7 +96,22 @@
           <div class="table-responsive">
             <table class="table table-bordered table-sm align-middle mb-0" id="sigGrid">
               <thead class="table-light">
-                <tr><th>信号名</th><th>start</th><th>len</th><th>端序</th><th>符号</th><th>factor</th><th>offset</th><th>min</th><th>max</th><th>unit</th><th>接收</th><th>值表</th><th>备注</th><th>操作</th></tr>
+                <tr>
+                  <th style="min-width: 160px;">信号名</th>
+                  <th style="min-width: 50px;">start</th>
+                  <th style="min-width: 40px;">len</th>
+                  <th style="min-width: 50px;">端序</th>
+                  <th style="min-width: 50px;">符号</th>
+                  <th style="min-width: 60px;">factor</th>
+                  <th style="min-width: 60px;">offset</th>
+                  <th style="min-width: 60px;">min</th>
+                  <th style="min-width: 60px;">max</th>
+                  <th style="min-width: 50px;">unit</th>
+                  <th style="min-width: 70px;">接收</th>
+                  <th style="min-width: 70px;">值表</th>
+                  <th style="min-width: 140px;">备注</th>
+                  <th style="min-width: 120px;">操作</th>
+                </tr>
               </thead>
               <tbody></tbody>
             </table>
@@ -140,6 +156,6 @@
 <div id="errOverlay" class="err-overlay" aria-live="polite"></div>
 <script src="./js/jquery.min.js"></script>
 <script src="./js/bootstrap.min.js"></script>
-<script src="./js/app.js" defer></script>
+<script src="./js/app_source.js" defer></script>
 </body>
 </html>

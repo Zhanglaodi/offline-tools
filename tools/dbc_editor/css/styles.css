@@ -27,15 +27,149 @@ body{background:#f6f7fb}
   min-width:60px;
 }
 
+/* 信号名输入框特殊处理 */
+#sigGrid input[data-k="name"]{
+  min-width:160px;
+  max-width:250px;
+}
+
+/* 备注输入框 */
+#sigGrid input[data-k="comment"]{
+  min-width:140px;
+  max-width:200px;
+}
+
+/* 接收方输入框 */
+#sigGrid input[data-k="receivers"]{
+  min-width:70px;
+  max-width:100px;
+}
+
+/* 其他数值输入框缩小 */
+#sigGrid input[data-k="factor"],
+#sigGrid input[data-k="offset"],
+#sigGrid input[data-k="min"],
+#sigGrid input[data-k="max"]{
+  min-width:60px;
+  max-width:80px;
+}
+
+/* start和len输入框 */
+#sigGrid input[data-k="start"]{
+  min-width:50px;
+  max-width:70px;
+}
+
+#sigGrid input[data-k="len"]{
+  min-width:40px;
+  max-width:60px;
+}
+
+/* unit输入框 */
+#sigGrid input[data-k="unit"]{
+  min-width:50px;
+  max-width:80px;
+}
+
 /* 信号表：值表列宽度 */
 #sigGrid th, #sigGrid td{vertical-align:middle}
 #sigGrid td.vt-col{min-width:180px}
+
+/* 信号表格优化 */
+#sigGrid {
+  table-layout: auto;
+  min-width: 1200px; /* 确保表格有足够宽度 */
+}
+
+/* 信号表格列宽度分配 */
+#sigGrid th:nth-child(1), /* 信号名 */
+#sigGrid td:nth-child(1) {
+  width: 180px;
+  min-width: 160px;
+}
+
+#sigGrid th:nth-child(2), /* start */
+#sigGrid td:nth-child(2),
+#sigGrid th:nth-child(3), /* len */
+#sigGrid td:nth-child(3) {
+  width: 60px;
+  min-width: 40px;
+}
+
+#sigGrid th:nth-child(4), /* 端序 */
+#sigGrid td:nth-child(4),
+#sigGrid th:nth-child(5), /* 符号 */
+#sigGrid td:nth-child(5) {
+  width: 60px;
+  min-width: 50px;
+}
+
+#sigGrid th:nth-child(6), /* factor */
+#sigGrid td:nth-child(6),
+#sigGrid th:nth-child(7), /* offset */
+#sigGrid td:nth-child(7),
+#sigGrid th:nth-child(8), /* min */
+#sigGrid td:nth-child(8),
+#sigGrid th:nth-child(9), /* max */
+#sigGrid td:nth-child(9) {
+  width: 70px;
+  min-width: 60px;
+}
+
+#sigGrid th:nth-child(10), /* unit */
+#sigGrid td:nth-child(10) {
+  width: 60px;
+  min-width: 50px;
+}
+
+#sigGrid th:nth-child(11), /* 接收 */
+#sigGrid td:nth-child(11) {
+  width: 80px;
+  min-width: 70px;
+}
+
+#sigGrid th:nth-child(12), /* 值表 */
+#sigGrid td:nth-child(12) {
+  width: 80px;
+  min-width: 70px;
+}
+
+#sigGrid th:nth-child(13), /* 备注 */
+#sigGrid td:nth-child(13) {
+  width: 160px;
+  min-width: 140px;
+}
+
+#sigGrid th:nth-child(14), /* 操作 */
+#sigGrid td:nth-child(14) {
+  width: 140px;
+  min-width: 120px;
+}
 
 /* 紧凑模式 */
 body.compact{font-size:12px}
 body.compact .form-control,
 body.compact .form-select{padding:.2rem .35rem; font-size:.82rem}
 body.compact .table{font-size:.82rem}
+
+/* 侧边栏隐藏功能 */
+.sidebar-hidden #sidebarColumn {
+  display: none !important;
+}
+
+.sidebar-hidden #mainContentColumn {
+  flex: 1;
+  max-width: 100%;
+}
+
+/* 侧边栏切换动画 */
+#sidebarColumn {
+  transition: all 0.3s ease;
+}
+
+#mainContentColumn {
+  transition: all 0.3s ease;
+}
 
 /* 错误浮层 */
 .err-overlay{
