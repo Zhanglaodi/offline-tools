@@ -514,12 +514,18 @@ body {
   font-size: 0.75rem;
   padding: var(--space-1) var(--space-2);
   border-radius: var(--radius-sm);
+  border: 1px solid var(--color-gray-200);
+  transition: all var(--transition-fast);
 }
 
 /* 空状态 */
 .empty-state {
   text-align: center;
   padding: var(--space-20) var(--space-4);
+  background: rgba(66, 184, 131, 0.05);
+  border-radius: var(--radius-lg);
+  border: 2px dashed var(--color-primary);
+  margin: var(--space-8) 0;
 }
 
 .empty-icon {
@@ -641,53 +647,199 @@ body {
   justify-content: flex-end;
 }
 
-/* 响应式设计 */
-@media (max-width: 768px) {
-  .nav-menu {
-    display: none;
-  }
-  
-  .hero-title {
-    font-size: 2rem;
-  }
-  
-  .hero-subtitle {
-    font-size: 1rem;
-  }
-  
-  .tools-grid {
-    grid-template-columns: 1fr;
-  }
-  
-  .footer-content {
-    flex-direction: column;
-    gap: var(--space-4);
-    text-align: center;
-  }
-  
-  .section-header {
-    flex-direction: column;
-    gap: var(--space-4);
-    align-items: stretch;
-  }
+/* 深色主题 */
+.dark-theme {
+  --color-white: #1e1e2e;
+  --color-gray-50: #1e1e2e;
+  --color-gray-100: #2a2a3a;
+  --color-gray-200: #3a3a4a;
+  --color-gray-300: #4a4a5a;
+  --color-gray-400: #6a6a7a;
+  --color-gray-500: #8a8a9a;
+  --color-gray-600: #aaaaaa;
+  --color-gray-700: #cccccc;
+  --color-gray-800: #eeeeee;
+  --color-gray-900: #ffffff;
 }
 
-/* 动画 */
-@keyframes fadeIn {
-  from { opacity: 0; transform: translateY(20px); }
-  to { opacity: 1; transform: translateY(0); }
+.dark-theme body {
+  background-color: var(--color-gray-50);
+  color: var(--color-gray-900);
 }
 
-.tool-card {
-  animation: fadeIn 0.3s ease-out;
+/* 列表视图样式 */
+.tools-grid.list-view .tool-card {
+  display: flex;
+  flex-direction: row;
+  align-items: center;
+  gap: var(--space-4);
+  min-height: 80px;
+  padding: var(--space-4);
 }
 
-/* 收藏状态 */
-.tool-card.favorited {
-  border-color: var(--color-warning);
-  background: linear-gradient(135deg, rgba(245, 158, 11, 0.05) 0%, rgba(245, 158, 11, 0.02) 100%);
+.tools-grid.list-view .tool-header {
+  flex: 1;
+  margin-bottom: 0;
 }
 
+.tools-grid.list-view .tool-url {
+  max-width: 200px;
+  margin-bottom: 0;
+}
+
+.tools-grid.list-view .tool-description {
+  flex: 2;
+  margin-bottom: 0;
+}
+
+.tools-grid.list-view .tool-footer {
+  flex-shrink: 0;
+}
+
+/* 离线状态样式 */
+.status-offline {
+  background: var(--color-error);
+  color: white;
+  font-size: 0.6rem;
+  padding: 0.125rem 0.25rem;
+  border-radius: var(--radius-sm);
+  margin-left: 0.5rem;
+  font-weight: 500;
+}
+
+/* 设置模态框中主题按钮的激活状态 */
+.theme-btn.active {
+  background: var(--color-primary) !important;
+  color: white !important;
+}
+
+/* 改进标签样式 */
+.tool-tag {
+  background: var(--color-gray-100);
+  color: var(--color-gray-600);
+  font-size: 0.75rem;
+  padding: var(--space-1) var(--space-2);
+  border-radius: var(--radius-sm);
+  border: 1px solid var(--color-gray-200);
+  transition: all var(--transition-fast);
+}
+
+.tool-tag:hover {
+  background: var(--color-primary);
+  color: white;
+  cursor: pointer;
+}
+
+/* 改进收藏按钮样式 */
 .action-btn.favorited {
-  color: var(--color-warning);
+  color: var(--color-warning) !important;
+  background: rgba(245, 158, 11, 0.1) !important;
+}
+
+/* 加载动画 */
+@keyframes pulse {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.5; }
+}
+
+.loading {
+  animation: pulse 1.5s ease-in-out infinite;
+}
+
+/* 改进空状态样式 */
+.empty-state {
+  text-align: center;
+  padding: var(--space-20) var(--space-4);
+  background: rgba(66, 184, 131, 0.05);
+  border-radius: var(--radius-lg);
+  border: 2px dashed var(--color-primary);
+  margin: var(--space-8) 0;
+}
+
+/* 搜索框焦点状态改进 */
+.search-box:focus-within {
+  box-shadow: var(--shadow-xl), 0 0 0 3px rgba(66, 184, 131, 0.1);
+  transform: translateY(-2px);
+}
+
+/* 卡片悬停效果改进 */
+.tool-card:hover {
+  border-color: var(--color-primary);
+  box-shadow: var(--shadow-lg), 0 0 0 1px rgba(66, 184, 131, 0.1);
+  transform: translateY(-2px);
+}
+
+/* 工具类型标签改进 */
+.tool-type {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-1);
+  font-size: 0.75rem;
+  padding: var(--space-1) var(--space-2);
+  border-radius: var(--radius-sm);
+  font-weight: 500;
+  border: 1px solid;
+}
+
+.tool-type.local {
+  background: rgba(16, 185, 129, 0.1);
+  color: var(--color-success);
+  border-color: rgba(16, 185, 129, 0.2);
+}
+
+.tool-type.web {
+  background: rgba(59, 130, 246, 0.1);
+  color: var(--color-info);
+  border-color: rgba(59, 130, 246, 0.2);
+}
+
+/* 统计数字动画 */
+.stat-number {
+  font-variant-numeric: tabular-nums;
+  transition: all 0.3s ease;
+}
+
+/* 表单验证样式 */
+.form-group input:invalid,
+.form-group textarea:invalid {
+  border-color: var(--color-error);
+}
+
+.form-group input:valid,
+.form-group textarea:valid {
+  border-color: var(--color-success);
+}
+
+/* 滚动条样式 */
+::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+
+::-webkit-scrollbar-track {
+  background: var(--color-gray-100);
+  border-radius: 4px;
+}
+
+::-webkit-scrollbar-thumb {
+  background: var(--color-gray-300);
+  border-radius: 4px;
+  transition: background 0.3s ease;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: var(--color-gray-400);
+}
+
+/* 深色主题下的滚动条 */
+.dark-theme ::-webkit-scrollbar-track {
+  background: var(--color-gray-200);
+}
+
+.dark-theme ::-webkit-scrollbar-thumb {
+  background: var(--color-gray-400);
+}
+
+.dark-theme ::-webkit-scrollbar-thumb:hover {
+  background: var(--color-gray-300);
 }
