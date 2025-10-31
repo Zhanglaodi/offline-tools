@@ -24,6 +24,7 @@ sys.path.insert(0, str(project_root))
 
 from simple_asc_reader import SimpleASCReader
 from help_manager import HelpTextManager
+from dbc_plugin import DBCPlugin
 
 # 设置中文字体
 plt.rcParams['font.sans-serif'] = ['SimHei', 'Microsoft YaHei', 'Arial Unicode MS']
@@ -64,8 +65,14 @@ class MultiSignalChartViewer:
         # 帮助文本管理器
         self.help_manager = HelpTextManager()
         
+        # DBC插件初始化
+        self.dbc_plugin = None
+        
         # 创建界面
         self.create_widgets()
+        
+        # 初始化DBC插件
+        self.init_dbc_plugin()
     
     def setup_window(self):
         """设置窗口属性"""
@@ -178,6 +185,9 @@ class MultiSignalChartViewer:
         self.can_id_combo = ttk.Combobox(id_frame, textvariable=self.can_id_var, state="readonly", width=12)
         self.can_id_combo.pack(side=tk.RIGHT)
         
+        # DBC数据库支持（将在init_dbc_plugin中初始化）
+        self.dbc_frame = None
+        
         # 信号配置
         ttk.Separator(add_frame, orient=tk.HORIZONTAL).pack(fill=tk.X, pady=5)
         
@@ -237,7 +247,8 @@ class MultiSignalChartViewer:
         # 添加按钮
         button_frame = ttk.Frame(add_frame)
         button_frame.pack(fill=tk.X, pady=(5, 0))
-        ttk.Button(button_frame, text="添加信号", command=self.add_signal).pack(side=tk.LEFT, padx=(0, 5))
+        self.add_signal_btn = ttk.Button(button_frame, text="添加信号", command=self.add_signal)
+        self.add_signal_btn.pack(side=tk.LEFT, padx=(0, 5))
         ttk.Button(button_frame, text="清除全部", command=self.clear_signals).pack(side=tk.RIGHT)
         
         # 信号列表
@@ -1659,6 +1670,51 @@ class MultiSignalChartViewer:
             
         except Exception as e:
             messagebox.showerror("错误", f"更新图表失败: {e}")
+    
+    def init_dbc_plugin(self):
+        """初始化DBC插件"""
+        try:
+            # 创建DBC插件实例
+            self.dbc_plugin = DBCPlugin(self)
+            
+            # 直接在创建界面时已经预留的位置添加DBC UI
+            # 查找添加信号的LabelFrame
+            def find_add_signal_frame(widget):
+                """递归查找添加信号的LabelFrame"""
+                if isinstance(widget, ttk.LabelFrame):
+                    try:
+                        text = widget.cget('text')
+                        if text and "添加信号" in text:
+                            return widget
+                    except:
+                        pass
+                
+                # 递归查找子控件
+                for child in widget.winfo_children():
+                    result = find_add_signal_frame(child)
+                    if result:
+                        return result
+                return None
+            
+            # 查找添加信号的frame
+            add_signal_frame = find_add_signal_frame(self.root)
+            
+            if add_signal_frame:
+                # 在添加信号frame中添加DBC UI
+                self.dbc_frame = self.dbc_plugin.create_dbc_ui(add_signal_frame)
+                print("✅ DBC插件UI已添加到界面")
+            else:
+                print("⚠️ 未找到添加信号的frame")
+                
+            print("✅ DBC插件初始化成功")
+            
+        except ImportError as e:
+            print(f"⚠️ DBC插件加载失败: {e}")
+            print("💡 DBC功能将不可用")
+        except Exception as e:
+            print(f"❌ DBC插件初始化失败: {e}")
+            import traceback
+            traceback.print_exc()
 
 def main():
     """主函数"""
