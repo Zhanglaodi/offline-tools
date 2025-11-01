@@ -162,9 +162,38 @@ class MultiSignalChartViewer:
         main_frame = ttk.Frame(self.root)
         main_frame.pack(fill=tk.BOTH, expand=True, padx=10, pady=10)
         
-        # 左侧控制面板
-        control_frame = ttk.LabelFrame(main_frame, text="控制面板", padding=10)
-        control_frame.pack(side=tk.LEFT, fill=tk.Y, padx=(0, 10))
+        # 左侧控制面板容器（带滚动条）
+        control_container = ttk.LabelFrame(main_frame, text="控制面板", padding=5)
+        control_container.pack(side=tk.LEFT, fill=tk.Y, padx=(0, 10))
+        
+        # 创建滚动画布 - 增加宽度以适应DBC内容
+        self.control_canvas = tk.Canvas(control_container, width=420, highlightthickness=0, bg='white')
+        control_scrollbar = ttk.Scrollbar(control_container, orient="vertical", command=self.control_canvas.yview)
+        self.control_scrollable_frame = ttk.Frame(self.control_canvas)
+        
+        # 配置滚动区域
+        def configure_scroll_region(event=None):
+            self.control_canvas.configure(scrollregion=self.control_canvas.bbox("all"))
+        
+        self.control_scrollable_frame.bind("<Configure>", configure_scroll_region)
+        
+        # 创建画布窗口
+        canvas_window = self.control_canvas.create_window((0, 0), window=self.control_scrollable_frame, anchor="nw")
+        
+        # 配置画布窗口宽度自适应
+        def configure_canvas_width(event=None):
+            canvas_width = self.control_canvas.winfo_width()
+            self.control_canvas.itemconfig(canvas_window, width=canvas_width)
+        
+        self.control_canvas.bind('<Configure>', configure_canvas_width)
+        self.control_canvas.configure(yscrollcommand=control_scrollbar.set)
+        
+        # 打包滚动组件
+        self.control_canvas.pack(side="left", fill="both", expand=True)
+        control_scrollbar.pack(side="right", fill="y")
+        
+        # 现在control_frame指向可滚动的框架
+        control_frame = self.control_scrollable_frame
         
         # 文件选择
         file_frame = ttk.Frame(control_frame)
@@ -174,78 +203,78 @@ class MultiSignalChartViewer:
         self.file_label.pack(fill=tk.X, pady=(5, 0))
         
         # 信号添加区域
-        add_frame = ttk.LabelFrame(control_frame, text="添加信号", padding=5)
-        add_frame.pack(fill=tk.X, pady=(0, 10))
+        self.add_frame = ttk.LabelFrame(control_frame, text="添加信号", padding=5)
+        self.add_frame.pack(fill=tk.X, pady=(0, 10))
         
         # CAN ID选择
-        id_frame = ttk.Frame(add_frame)
+        id_frame = ttk.Frame(self.add_frame)
         id_frame.pack(fill=tk.X, pady=2)
         ttk.Label(id_frame, text="CAN ID:", width=8).pack(side=tk.LEFT)
         self.can_id_var = tk.StringVar()
-        self.can_id_combo = ttk.Combobox(id_frame, textvariable=self.can_id_var, state="readonly", width=12)
-        self.can_id_combo.pack(side=tk.RIGHT)
+        self.can_id_combo = ttk.Combobox(id_frame, textvariable=self.can_id_var, state="readonly", width=15)
+        self.can_id_combo.pack(side=tk.RIGHT, fill=tk.X, expand=True, padx=(5, 0))
         
         # DBC数据库支持（将在init_dbc_plugin中初始化）
         self.dbc_frame = None
         
         # 信号配置
-        ttk.Separator(add_frame, orient=tk.HORIZONTAL).pack(fill=tk.X, pady=5)
+        ttk.Separator(self.add_frame, orient=tk.HORIZONTAL).pack(fill=tk.X, pady=5)
         
         # 起始位
-        start_frame = ttk.Frame(add_frame)
+        start_frame = ttk.Frame(self.add_frame)
         start_frame.pack(fill=tk.X, pady=2)
         ttk.Label(start_frame, text="起始位:", width=8).pack(side=tk.LEFT)
         self.start_bit_var = tk.StringVar(value="0")
-        ttk.Entry(start_frame, textvariable=self.start_bit_var, width=8).pack(side=tk.RIGHT)
+        ttk.Entry(start_frame, textvariable=self.start_bit_var, width=10).pack(side=tk.RIGHT, fill=tk.X, expand=True, padx=(5, 0))
         
         # 长度
-        length_frame = ttk.Frame(add_frame)
+        length_frame = ttk.Frame(self.add_frame)
         length_frame.pack(fill=tk.X, pady=2)
         ttk.Label(length_frame, text="长度:", width=8).pack(side=tk.LEFT)
         self.length_var = tk.StringVar(value="8")
-        ttk.Entry(length_frame, textvariable=self.length_var, width=8).pack(side=tk.RIGHT)
+        ttk.Entry(length_frame, textvariable=self.length_var, width=10).pack(side=tk.RIGHT, fill=tk.X, expand=True, padx=(5, 0))
         
         # 系数
-        factor_frame = ttk.Frame(add_frame)
+        factor_frame = ttk.Frame(self.add_frame)
         factor_frame.pack(fill=tk.X, pady=2)
         ttk.Label(factor_frame, text="系数:", width=8).pack(side=tk.LEFT)
         self.factor_var = tk.StringVar(value="1.0")
-        ttk.Entry(factor_frame, textvariable=self.factor_var, width=8).pack(side=tk.RIGHT)
+        ttk.Entry(factor_frame, textvariable=self.factor_var, width=10).pack(side=tk.RIGHT, fill=tk.X, expand=True, padx=(5, 0))
         
         # 偏移
-        offset_frame = ttk.Frame(add_frame)
+        offset_frame = ttk.Frame(self.add_frame)
         offset_frame.pack(fill=tk.X, pady=2)
         ttk.Label(offset_frame, text="偏移:", width=8).pack(side=tk.LEFT)
         self.offset_var = tk.StringVar(value="0.0")
-        ttk.Entry(offset_frame, textvariable=self.offset_var, width=8).pack(side=tk.RIGHT)
+        ttk.Entry(offset_frame, textvariable=self.offset_var, width=10).pack(side=tk.RIGHT, fill=tk.X, expand=True, padx=(5, 0))
         
         # 有符号
         self.signed_var = tk.BooleanVar()
-        ttk.Checkbutton(add_frame, text="有符号数", variable=self.signed_var).pack(anchor=tk.W, pady=2)
+        ttk.Checkbutton(self.add_frame, text="有符号数", variable=self.signed_var).pack(anchor=tk.W, pady=2)
         
         # 字节序选择
-        endian_frame = ttk.Frame(add_frame)
+        endian_frame = ttk.Frame(self.add_frame)
         endian_frame.pack(fill=tk.X, pady=2)
         ttk.Label(endian_frame, text="字节序:", width=8).pack(side=tk.LEFT)
         self.endian_var = tk.StringVar(value="little")
         self.endian_combo = ttk.Combobox(endian_frame, textvariable=self.endian_var, 
-                                   values=["big", "little"], state="readonly", width=8)
-        self.endian_combo.pack(side=tk.RIGHT)
+                                   values=["big", "little"], state="readonly", width=10)
+        self.endian_combo.pack(side=tk.RIGHT, fill=tk.X, expand=True, padx=(5, 0))
         
         # 字节序说明
-        endian_info = ttk.Label(add_frame, text="big=大端(Motorola), little=小端(Intel)", 
+        endian_info = ttk.Label(self.add_frame, text="big=大端(Motorola), little=小端(Intel)", 
                                font=("Arial", 8), foreground="gray")
         endian_info.pack(anchor=tk.W, pady=(0, 2))
         
         # 信号名称
-        name_frame = ttk.Frame(add_frame)
+        name_frame = ttk.Frame(self.add_frame)
         name_frame.pack(fill=tk.X, pady=2)
         ttk.Label(name_frame, text="名称:", width=8).pack(side=tk.LEFT)
         self.signal_name_var = tk.StringVar(value="信号1")
-        ttk.Entry(name_frame, textvariable=self.signal_name_var, width=8).pack(side=tk.RIGHT)
+        ttk.Entry(name_frame, textvariable=self.signal_name_var, width=10).pack(side=tk.RIGHT, fill=tk.X, expand=True, padx=(5, 0))
         
         # 添加按钮
-        button_frame = ttk.Frame(add_frame)
+        button_frame = ttk.Frame(self.add_frame)
         button_frame.pack(fill=tk.X, pady=(5, 0))
         self.add_signal_btn = ttk.Button(button_frame, text="添加信号", command=self.add_signal)
         self.add_signal_btn.pack(side=tk.LEFT, padx=(0, 5))
@@ -306,13 +335,13 @@ class MultiSignalChartViewer:
         
         ttk.Label(time_input_frame, text="开始:", width=6).pack(side=tk.LEFT)
         self.time_start_var = tk.StringVar(value="")
-        self.time_start_entry = ttk.Entry(time_input_frame, textvariable=self.time_start_var, width=10)
-        self.time_start_entry.pack(side=tk.LEFT, padx=(0, 5))
+        self.time_start_entry = ttk.Entry(time_input_frame, textvariable=self.time_start_var, width=12)
+        self.time_start_entry.pack(side=tk.LEFT, padx=(0, 5), fill=tk.X, expand=True)
         
         ttk.Label(time_input_frame, text="结束:", width=6).pack(side=tk.LEFT)
         self.time_end_var = tk.StringVar(value="")
-        self.time_end_entry = ttk.Entry(time_input_frame, textvariable=self.time_end_var, width=10)
-        self.time_end_entry.pack(side=tk.LEFT)
+        self.time_end_entry = ttk.Entry(time_input_frame, textvariable=self.time_end_var, width=12)
+        self.time_end_entry.pack(side=tk.LEFT, fill=tk.X, expand=True)
         
         time_btn_frame = ttk.Frame(time_frame)
         time_btn_frame.pack(fill=tk.X, pady=(5, 0))
@@ -363,6 +392,30 @@ class MultiSignalChartViewer:
         # 状态栏
         self.status_label = ttk.Label(self.root, text="请选择ASC文件并添加信号", relief=tk.SUNKEN)
         self.status_label.pack(side=tk.BOTTOM, fill=tk.X)
+        
+        # 绑定控制面板的鼠标滚轮事件
+        self.bind_mousewheel_to_control_panel()
+    
+    def bind_mousewheel_to_control_panel(self):
+        """绑定控制面板的鼠标滚轮事件"""
+        def _on_mousewheel(event):
+            # 检查鼠标是否在控制面板区域内
+            widget = event.widget
+            while widget:
+                if widget == self.control_canvas:
+                    self.control_canvas.yview_scroll(int(-1*(event.delta/120)), "units")
+                    break
+                widget = widget.master
+        
+        def _bind_to_mousewheel(widget):
+            widget.bind("<MouseWheel>", _on_mousewheel)
+            for child in widget.winfo_children():
+                _bind_to_mousewheel(child)
+        
+        # 绑定控制面板及其所有子组件
+        _bind_to_mousewheel(self.control_scrollable_frame)
+        # 同时绑定画布本身
+        self.control_canvas.bind("<MouseWheel>", _on_mousewheel)
     
     def calculate_frame_stats(self, can_id, use_cache=True):
         """计算帧统计信息：丢帧和周期 - 优化版本"""
@@ -1690,34 +1743,16 @@ class MultiSignalChartViewer:
     def init_dbc_plugin(self):
         """初始化DBC插件"""
         try:
+            from dbc_plugin import DBCPlugin
+            
+            print("🔌 初始化DBC插件...")
             # 创建DBC插件实例
             self.dbc_plugin = DBCPlugin(self)
             
-            # 直接在创建界面时已经预留的位置添加DBC UI
-            # 查找添加信号的LabelFrame
-            def find_add_signal_frame(widget):
-                """递归查找添加信号的LabelFrame"""
-                if isinstance(widget, ttk.LabelFrame):
-                    try:
-                        text = widget.cget('text')
-                        if text and "添加信号" in text:
-                            return widget
-                    except:
-                        pass
-                
-                # 递归查找子控件
-                for child in widget.winfo_children():
-                    result = find_add_signal_frame(child)
-                    if result:
-                        return result
-                return None
-            
-            # 查找添加信号的frame
-            add_signal_frame = find_add_signal_frame(self.root)
-            
-            if add_signal_frame:
+            # 直接在add_frame中添加DBC UI
+            if hasattr(self, 'add_frame') and self.add_frame:
                 # 在添加信号frame中添加DBC UI
-                self.dbc_frame = self.dbc_plugin.create_dbc_ui(add_signal_frame)
+                self.dbc_frame = self.dbc_plugin.create_dbc_ui(self.add_frame)
                 print("✅ DBC插件UI已添加到界面")
             else:
                 print("⚠️ 未找到添加信号的frame")
@@ -1727,6 +1762,10 @@ class MultiSignalChartViewer:
         except ImportError as e:
             print(f"⚠️ DBC插件加载失败: {e}")
             print("💡 DBC功能将不可用")
+        except Exception as e:
+            print(f"❌ DBC插件初始化失败: {e}")
+            import traceback
+            traceback.print_exc()
         except Exception as e:
             print(f"❌ DBC插件初始化失败: {e}")
             import traceback

@@ -51,8 +51,8 @@ class DBCPlugin:
         ttk.Label(dbc_file_frame, text="DBC文件:", width=8).pack(side=tk.LEFT)
         self.dbc_file_var = tk.StringVar(value="未选择DBC文件")
         self.dbc_file_label = ttk.Label(dbc_file_frame, textvariable=self.dbc_file_var, 
-                                       foreground="gray", width=30)
-        self.dbc_file_label.pack(side=tk.LEFT, padx=(5, 0))
+                                       foreground="gray", width=35)
+        self.dbc_file_label.pack(side=tk.LEFT, padx=(5, 0), fill=tk.X, expand=True)
         
         ttk.Button(dbc_file_frame, text="选择DBC", 
                   command=self.select_dbc_file).pack(side=tk.RIGHT, padx=(5, 0))
@@ -64,8 +64,8 @@ class DBCPlugin:
         ttk.Label(signal_select_frame, text="信号:", width=8).pack(side=tk.LEFT)
         self.dbc_signal_var = tk.StringVar()
         self.dbc_signal_combo = ttk.Combobox(signal_select_frame, textvariable=self.dbc_signal_var, 
-                                           state="readonly", width=25)
-        self.dbc_signal_combo.pack(side=tk.LEFT, padx=(5, 0))
+                                           state="readonly", width=30)
+        self.dbc_signal_combo.pack(side=tk.LEFT, padx=(5, 0), fill=tk.X, expand=True)
         self.dbc_signal_combo.bind('<<ComboboxSelected>>', self.on_dbc_signal_selected)
         
         ttk.Button(signal_select_frame, text="添加到列表", 
