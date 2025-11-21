@@ -797,9 +797,19 @@ class MultiSignalChartViewer:
                 messagebox.showwarning("警告", f"没有找到CAN ID {can_id_str}的消息")
                 return
             
-            if start_bit + length > 64:
-                messagebox.showwarning("警告", "信号位置超出CAN数据范围(64位)")
-                return
+            # 检查信号是否有效（根据字节序不同规则）
+            if endian == "big":
+                # 大端序：检查起始字节和长度
+                start_byte = start_bit // 8
+                num_bytes = (length + 7) // 8
+                if start_byte + num_bytes > 8:
+                    messagebox.showwarning("警告", f"大端序信号超出范围: 从byte{start_byte}开始需要{num_bytes}字节")
+                    return
+            else:
+                # 小端序：start_bit + length不能超过64
+                if start_bit + length > 64:
+                    messagebox.showwarning("警告", "小端序信号位置超出CAN数据范围(64位)")
+                    return
             
             # 添加信号配置
             signal_config = {
@@ -819,14 +829,35 @@ class MultiSignalChartViewer:
             # 计算帧统计信息
             frame_stats = self.calculate_frame_stats(can_id)
             
+            # 计算位范围显示
+            if endian == "big":
+                # 大端序位范围显示
+                start_byte = start_bit // 8
+                start_bit_in_byte = start_bit % 8
+                bits_in_first_byte = start_bit_in_byte + 1
+                
+                if length <= bits_in_first_byte:
+                    # 单字节内：start_bit是MSB，往后递增
+                    end_bit = start_bit + length - 1
+                    bit_range_text = f"{start_bit}~{end_bit}位(MSB→LSB)"
+                else:
+                    # 跨字节：显示字节范围
+                    num_bytes = (length + 7) // 8
+                    end_byte = start_byte + num_bytes - 1
+                    bit_range_text = f"byte{start_byte}~{end_byte}({length}位,大端)"
+            else:
+                # 小端序：start_bit是LSB
+                end_bit = start_bit + length - 1
+                bit_range_text = f"{start_bit}~{end_bit}位(LSB→MSB)"
+            
             # 更新列表显示（包含丢帧信息）
             endian_text = "大端" if endian == "big" else "小端"
             if frame_stats:
                 period_text = f"{frame_stats['period_ms']:.1f}ms"
                 drop_text = f"{frame_stats['dropped_frames']}帧({frame_stats['drop_rate']:.1f}%)"
-                display_text = f"{name} | {can_id_str} | {start_bit}-{start_bit+length-1}位 | {endian_text} | 周期:{period_text} | 丢帧:{drop_text}"
+                display_text = f"{name} | {can_id_str} | {bit_range_text} | {endian_text} | 周期:{period_text} | 丢帧:{drop_text}"
             else:
-                display_text = f"{name} | {can_id_str} | {start_bit}-{start_bit+length-1}位 | {endian_text} | 统计:计算失败"
+                display_text = f"{name} | {can_id_str} | {bit_range_text} | {endian_text} | 统计:计算失败"
             
             self.signal_listbox.insert(tk.END, display_text)
             
@@ -947,36 +978,74 @@ class MultiSignalChartViewer:
         self.status_label.config(text="已清除所有信号")
     
     def extract_signal_value(self, data_bytes, start_bit, length, factor=1.0, offset=0.0, signed=False, endian="big"):
-        """提取信号值 - 高性能优化版本"""
+        """
+        提取信号值 - 支持大端序(Motorola)和小端序(Intel)
+        
+        DBC大端序(Motorola @0+): 
+            - start_bit指示MSB所在字节
+            - 信号跨字节时，按字节边界向后扩展
+            - 提取的字节按大端序组合
+            示例1: start_bit=4, length=2 → 从bit4开始，MSB=bit4, LSB=bit5
+            示例2: start_bit=15, length=16 → 从byte1开始，取byte1+byte2大端序组合
+        
+        小端序(Intel @1+): start_bit是LSB位置，位操作提取
+        """
         try:
-            # 优化：预计算常用值
-            total_bits = len(data_bytes) << 3  # 位运算替代乘法
-            if start_bit + length > total_bits:
-                return None, None
+            total_bits = len(data_bytes) * 8
             
-            # 优化：使用位运算进行字节组合
             if endian == "big":
-                data_int = 0
-                for byte in data_bytes:
-                    data_int = (data_int << 8) | byte
-                right_start_bit = total_bits - start_bit - length
+                # 大端序处理
+                # 对于跨字节信号：start_bit指示起始字节，按字节对齐提取
+                # 对于字节内信号：需要按位精确提取
+                
+                start_byte = start_bit // 8
+                start_bit_in_byte = start_bit % 8
+                
+                # 计算需要多少字节
+                # 从start_bit_in_byte开始，需要length位
+                bits_in_first_byte = start_bit_in_byte + 1  # 第一个字节能提供的位数
+                
+                if length <= bits_in_first_byte:
+                    # 信号在单字节内
+                    byte_val = data_bytes[start_byte]
+                    #从start_bit_in_byte位置开始，向后取length位
+                    # bit编号从高到低：start_bit_in_byte...0
+                    lsb_pos = start_bit_in_byte - length + 1
+                    raw_value = (byte_val >> lsb_pos) & ((1 << length) - 1)
+                else:
+                    # 信号跨多个字节：按字节对齐，直接提取
+                    num_bytes = (length + 7) // 8
+                    
+                    if start_byte + num_bytes > len(data_bytes):
+                        return None, None
+                    
+                    # 按大端序组合字节
+                    raw_value = 0
+                    for i in range(num_bytes):
+                        raw_value = (raw_value << 8) | data_bytes[start_byte + i]
+                    
+                    # 如果长度不是8的倍数，右移去掉多余位
+                    extra_bits = num_bytes * 8 - length
+                    if extra_bits > 0:
+                        raw_value = raw_value >> extra_bits
+                
             else:
+                # 小端序：转为整数后位操作
                 data_int = 0
                 for i, byte in enumerate(data_bytes):
-                    data_int |= byte << (i << 3)  # 位运算替代乘法
-                right_start_bit = start_bit
+                    data_int |= byte << (i * 8)
+                
+                # start_bit是LSB位置
+                mask = (1 << length) - 1
+                raw_value = (data_int >> start_bit) & mask
             
-            # 优化：使用位运算提取信号
-            mask = (1 << length) - 1
-            raw_value = (data_int >> right_start_bit) & mask
-            
-            # 优化：有符号数处理
+            # 有符号数处理
             if signed and length < 32:
                 sign_bit = 1 << (length - 1)
                 if raw_value & sign_bit:
                     raw_value -= 1 << length
             
-            # 优化：避免不必要的计算
+            # 应用系数和偏移
             if factor == 1.0 and offset == 0.0:
                 physical_value = float(raw_value)
             else:
