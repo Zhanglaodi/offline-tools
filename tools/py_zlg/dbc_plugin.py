@@ -270,8 +270,11 @@ class DBCPlugin:
         signal_options = []
         for message in self.dbc_parser.messages:
             for signal in message.signals:
-                # 格式: "消息名.信号名 (0x123) - 单位"
-                option = f"{message.name}.{signal.name} (0x{message.can_id:X})"
+                # 格式: "消息名.信号名 (0x123) - 单位" 或 "消息名.信号名 (0x123 Ext) - 单位"
+                can_id_str = f"0x{message.can_id:X}"
+                if message.is_extended:
+                    can_id_str += " Ext"
+                option = f"{message.name}.{signal.name} ({can_id_str})"
                 if signal.unit:
                     option += f" - {signal.unit}"
                 signal_options.append(option)
@@ -304,7 +307,7 @@ class DBCPlugin:
     def parse_signal_selection(self, selection: str):
         """解析信号选择字符串"""
         try:
-            # 格式: "消息名.信号名 (0x123) - 单位"
+            # 格式: "消息名.信号名 (0x123) - 单位" 或 "消息名.信号名 (0x123 Ext) - 单位"
             parts = selection.split('(')
             if len(parts) < 2:
                 return None, None
@@ -316,9 +319,11 @@ class DBCPlugin:
             
             message_name, signal_name = msg_signal_part.rsplit('.', 1)
             
-            # 提取CAN ID
-            can_id_part = parts[1].split(')')[0]
-            can_id = int(can_id_part, 16)
+            # 提取CAN ID（可能包含 "Ext" 标记）
+            can_id_part = parts[1].split(')')[0].strip()
+            # 移除 "Ext" 标记（如果存在）
+            can_id_hex = can_id_part.split()[0]  # 取第一部分，例如 "0x123" 或 "0x123 Ext" 中的 "0x123"
+            can_id = int(can_id_hex, 16)
             
             # 查找对应的消息和信号
             for message in self.dbc_parser.messages:
@@ -431,14 +436,20 @@ class DBCPlugin:
             can_id_str = f"0x{can_id:X}"
             endian_text = "大端" if signal_config['endian'] == "big" else "小端"
             start_bit = signal.start_bit
-            end_bit = start_bit + signal.length - 1
+            length = signal.length
+            
+            # 格式化位置信息
+            if signal_config['endian'] == "big":
+                position_text = f"起始位:{start_bit}(MSB) | 长度:{length}位"
+            else:
+                position_text = f"起始位:{start_bit}(LSB) | 长度:{length}位"
             
             if frame_stats:
                 period_text = f"{frame_stats['period_ms']:.1f}ms"
                 drop_text = f"{frame_stats['dropped_frames']}帧({frame_stats['drop_rate']:.1f}%)"
-                display_text = f"{signal_display_name} | {can_id_str} | {start_bit}-{end_bit}位 | {endian_text} | 周期:{period_text} | 丢帧:{drop_text}"
+                display_text = f"{signal_display_name} | {can_id_str} | {position_text} | {endian_text} | 周期:{period_text} | 丢帧:{drop_text}"
             else:
-                display_text = f"{signal_display_name} | {can_id_str} | {start_bit}-{end_bit}位 | {endian_text} | 统计:计算失败"
+                display_text = f"{signal_display_name} | {can_id_str} | {position_text} | {endian_text} | 统计:计算失败"
             
             self.parent_app.signal_listbox.insert(tk.END, display_text)
             

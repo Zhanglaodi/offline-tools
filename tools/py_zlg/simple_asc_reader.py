@@ -102,14 +102,16 @@ class SimpleASCReader:
         match = re.match(pattern1, line, re.IGNORECASE)
         if match:
             timestamp, channel, can_id, direction, dlc, data_str = match.groups()
-            is_extended = line.find(can_id + 'x') != -1 or len(can_id) > 3
+            # 检查是否有 'x' 后缀标记（扩展帧标记），具体数值判断在 _create_message 中
+            is_extended = line.find(can_id + 'x') != -1
             return self._create_message(timestamp, channel, can_id, direction, dlc, data_str, line_num, is_extended)
         
         # 尝试匹配格式2（支持扩展帧x标记）
         match = re.match(pattern2, line, re.IGNORECASE)
         if match:
             timestamp, channel, can_id, direction, dlc, data_str = match.groups()
-            is_extended = line.find(can_id + 'x') != -1 or len(can_id) > 3
+            # 检查是否有 'x' 后缀标记（扩展帧标记），具体数值判断在 _create_message 中
+            is_extended = line.find(can_id + 'x') != -1
             return self._create_message(timestamp, channel, can_id, direction, dlc, data_str, line_num, is_extended)
         
         # 尝试匹配格式3（8位十六进制通常是扩展帧）
@@ -144,8 +146,10 @@ class SimpleASCReader:
             
             # 自动检测扩展帧（如果没有明确指定）
             if not is_extended:
+                # 标准帧: 0x000 - 0x7FF (0-2047)
+                # 扩展帧: 0x000 - 0x1FFFFFFF (0-536870911)
                 # 如果CAN ID > 0x7FF (2047)，则认为是扩展帧
-                is_extended = can_id_int > 0x7FF or len(clean_can_id) > 3
+                is_extended = can_id_int > 0x7FF
             
             return {
                 'timestamp': float(timestamp),

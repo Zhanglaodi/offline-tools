@@ -37,6 +37,7 @@ class DBCMessage:
     signals: List[DBCSignal]
     comment: str = ""
     cycle_time: int = 0  # 周期时间(ms)
+    is_extended: bool = False  # 是否为扩展帧
 
 @dataclass
 class DBCNode:
@@ -47,12 +48,48 @@ class DBCNode:
 class DBCParser:
     """DBC文件解析器"""
     
+    # 扩展帧标记位（DBC 文件中扩展帧 ID = 实际ID + 0x80000000）
+    EXTENDED_FRAME_FLAG = 0x80000000
+    
     def __init__(self):
         self.nodes: List[DBCNode] = []
         self.messages: List[DBCMessage] = []
         self.value_tables: Dict[str, Dict[int, str]] = {}
         self.attributes: Dict[str, Any] = {}
         self.comments: Dict[str, str] = {}
+    
+    @staticmethod
+    def _convert_raw_can_id(raw_id: int) -> tuple:
+        """
+        转换原始 CAN ID 为实际 ID 和扩展帧标记
+        
+        DBC 文件中扩展帧的两种编码方式：
+        1. 标准方式：actual_id + 0x80000000
+        2. 简化方式：直接写 actual_id（某些工具）
+        
+        标准帧范围：0x000 - 0x7FF (0-2047)
+        扩展帧范围：0x000 - 0x1FFFFFFF (0-536870911)
+        
+        Args:
+            raw_id: DBC 文件中的原始 CAN ID
+            
+        Returns:
+            (actual_id, is_extended): 实际 CAN ID 和是否为扩展帧
+        """
+        if raw_id >= DBCParser.EXTENDED_FRAME_FLAG:
+            # 标准扩展帧编码：ID + 0x80000000
+            is_extended = True
+            actual_id = raw_id - DBCParser.EXTENDED_FRAME_FLAG
+        elif raw_id > 0x7FF:
+            # 简化扩展帧编码：直接写实际 ID（超过标准帧范围视为扩展帧）
+            is_extended = True
+            actual_id = raw_id
+        else:
+            # 标准帧：0x000 - 0x7FF
+            is_extended = False
+            actual_id = raw_id
+        
+        return actual_id, is_extended
     
     def parse_file(self, file_path: str) -> bool:
         """
@@ -155,10 +192,22 @@ class DBCParser:
         message_pattern = r'BO_\s+(\d+)\s+(\w+):\s*(\d+)\s+(\w+)'
         
         for msg_match in re.finditer(message_pattern, content, re.MULTILINE):
-            can_id = int(msg_match.group(1))
+            can_id_raw = int(msg_match.group(1))
             msg_name = msg_match.group(2)
             dlc = int(msg_match.group(3))
             transmitter = msg_match.group(4)
+            
+            # 过滤特殊消息：VECTOR__INDEPENDENT_SIG_MSG (用于未绑定的独立信号)
+            # 这类消息的 ID 通常是 0xC0000000 (3221225472) 或其他超出范围的值
+            if 'INDEPENDENT_SIG_MSG' in msg_name or can_id_raw >= 0xC0000000:
+                continue
+            
+            # 判断是否为扩展帧并提取实际的 CAN ID
+            can_id, is_extended = self._convert_raw_can_id(can_id_raw)
+            
+            # 过滤无效的扩展帧 ID（超出扩展帧最大范围 0x1FFFFFFF）
+            if is_extended and can_id > 0x1FFFFFFF:
+                continue
             
             # 查找该消息的所有信号
             signals = self._parse_signals_for_message(content, msg_match.end())
@@ -168,7 +217,8 @@ class DBCParser:
                 name=msg_name,
                 dlc=dlc,
                 transmitter=transmitter,
-                signals=signals
+                signals=signals,
+                is_extended=is_extended
             )
             
             self.messages.append(message)
@@ -246,14 +296,16 @@ class DBCParser:
                             node.comment = comment
                             break
                 elif comment_type == 'message':
-                    can_id = int(match.group(1))
+                    can_id_raw = int(match.group(1))
+                    can_id, _ = self._convert_raw_can_id(can_id_raw)
                     comment = match.group(2)
                     for message in self.messages:
                         if message.can_id == can_id:
                             message.comment = comment
                             break
                 elif comment_type == 'signal':
-                    can_id = int(match.group(1))
+                    can_id_raw = int(match.group(1))
+                    can_id, _ = self._convert_raw_can_id(can_id_raw)
                     signal_name = match.group(2)
                     comment = match.group(3)
                     for message in self.messages:
@@ -271,7 +323,8 @@ class DBCParser:
         
         for match in re.finditer(attr_pattern, content, re.MULTILINE):
             attr_name = match.group(1)
-            can_id = int(match.group(2))
+            can_id_raw = int(match.group(2))
+            can_id, _ = self._convert_raw_can_id(can_id_raw)
             attr_value = match.group(3).strip()
             
             if attr_name == "GenMsgCycleTime":
@@ -318,6 +371,7 @@ class DBCParser:
                     'message_name': message.name,
                     'can_id': message.can_id,
                     'can_id_hex': f"0x{message.can_id:X}",
+                    'is_extended': message.is_extended,
                     'signal_name': signal.name,
                     'start_bit': signal.start_bit,
                     'length': signal.length,
@@ -357,7 +411,8 @@ def demo_dbc_parser():
             # 显示前几个消息
             print(f"\n📋 消息列表:")
             for i, msg in enumerate(parser.messages[:5]):
-                print(f"   {i+1}. {msg.name} (0x{msg.can_id:X}) - {len(msg.signals)}个信号")
+                ext_flag = " (扩展帧)" if msg.is_extended else ""
+                print(f"   {i+1}. {msg.name} (0x{msg.can_id:X}{ext_flag}) - {len(msg.signals)}个信号")
                 for signal in msg.signals[:3]:  # 显示前3个信号
                     print(f"      • {signal.name}: {signal.start_bit}位, {signal.length}位长")
             

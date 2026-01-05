@@ -829,35 +829,22 @@ class MultiSignalChartViewer:
             # 计算帧统计信息
             frame_stats = self.calculate_frame_stats(can_id)
             
-            # 计算位范围显示
+            # 格式化信号位置显示
             if endian == "big":
-                # 大端序位范围显示
-                start_byte = start_bit // 8
-                start_bit_in_byte = start_bit % 8
-                bits_in_first_byte = start_bit_in_byte + 1
-                
-                if length <= bits_in_first_byte:
-                    # 单字节内：start_bit是MSB，往后递增
-                    end_bit = start_bit + length - 1
-                    bit_range_text = f"{start_bit}~{end_bit}位(MSB→LSB)"
-                else:
-                    # 跨字节：显示字节范围
-                    num_bytes = (length + 7) // 8
-                    end_byte = start_byte + num_bytes - 1
-                    bit_range_text = f"byte{start_byte}~{end_byte}({length}位,大端)"
+                # 大端序：起始位(MSB最高位)
+                position_text = f"起始位:{start_bit}(MSB) | 长度:{length}位"
             else:
-                # 小端序：start_bit是LSB
-                end_bit = start_bit + length - 1
-                bit_range_text = f"{start_bit}~{end_bit}位(LSB→MSB)"
+                # 小端序：起始位(LSB最低位)
+                position_text = f"起始位:{start_bit}(LSB) | 长度:{length}位"
             
             # 更新列表显示（包含丢帧信息）
             endian_text = "大端" if endian == "big" else "小端"
             if frame_stats:
                 period_text = f"{frame_stats['period_ms']:.1f}ms"
                 drop_text = f"{frame_stats['dropped_frames']}帧({frame_stats['drop_rate']:.1f}%)"
-                display_text = f"{name} | {can_id_str} | {bit_range_text} | {endian_text} | 周期:{period_text} | 丢帧:{drop_text}"
+                display_text = f"{name} | {can_id_str} | {position_text} | {endian_text} | 周期:{period_text} | 丢帧:{drop_text}"
             else:
-                display_text = f"{name} | {can_id_str} | {bit_range_text} | {endian_text} | 统计:计算失败"
+                display_text = f"{name} | {can_id_str} | {position_text} | {endian_text} | 统计:计算失败"
             
             self.signal_listbox.insert(tk.END, display_text)
             
