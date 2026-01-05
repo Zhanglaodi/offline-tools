@@ -121,7 +121,7 @@ exe = EXE(
     a.scripts,
     [],
     exclude_binaries=True,  # 关键：生成文件夹版本
-    name='CAN信号分析器_v3.1_DBC版',
+    name='CAN信号分析器_v3.4_DBC版',
     debug=False,
     bootloader_ignore_signals=False,
     strip=False,
@@ -143,5 +143,5 @@ coll = COLLECT(
     strip=False,
     upx=True,
     upx_exclude=[],
-    name='CAN信号分析器_v3.1_DBC文件夹版',
+    name='CAN信号分析器_v3.4_DBC文件夹版',
 )

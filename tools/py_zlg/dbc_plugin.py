@@ -270,13 +270,11 @@ class DBCPlugin:
         signal_options = []
         for message in self.dbc_parser.messages:
             for signal in message.signals:
-                # 格式: "消息名.信号名 (0x123) - 单位" 或 "消息名.信号名 (0x123 Ext) - 单位"
+                # 格式: "信号名 (0x123)" 或 "信号名 (0x123 Ext)"
                 can_id_str = f"0x{message.can_id:X}"
                 if message.is_extended:
                     can_id_str += " Ext"
-                option = f"{message.name}.{signal.name} ({can_id_str})"
-                if signal.unit:
-                    option += f" - {signal.unit}"
+                option = f"{signal.name} ({can_id_str})"
                 signal_options.append(option)
         
         # 更新下拉框
@@ -307,17 +305,13 @@ class DBCPlugin:
     def parse_signal_selection(self, selection: str):
         """解析信号选择字符串"""
         try:
-            # 格式: "消息名.信号名 (0x123) - 单位" 或 "消息名.信号名 (0x123 Ext) - 单位"
+            # 格式: "信号名 (0x123) - 单位" 或 "信号名 (0x123 Ext) - 单位"
             parts = selection.split('(')
             if len(parts) < 2:
                 return None, None
             
-            # 提取消息名和信号名
-            msg_signal_part = parts[0].strip()
-            if '.' not in msg_signal_part:
-                return None, None
-            
-            message_name, signal_name = msg_signal_part.rsplit('.', 1)
+            # 提取信号名
+            signal_name = parts[0].strip()
             
             # 提取CAN ID（可能包含 "Ext" 标记）
             can_id_part = parts[1].split(')')[0].strip()
@@ -327,7 +321,7 @@ class DBCPlugin:
             
             # 查找对应的消息和信号
             for message in self.dbc_parser.messages:
-                if message.name == message_name and message.can_id == can_id:
+                if message.can_id == can_id:
                     for signal in message.signals:
                         if signal.name == signal_name:
                             return message, signal
@@ -357,9 +351,7 @@ class DBCPlugin:
         
         try:
             # 检查信号名称唯一性
-            signal_display_name = f"{message.name}.{signal.name}"
-            if signal.unit:
-                signal_display_name += f" ({signal.unit})"
+            signal_display_name = signal.name
             
             # 检查是否已存在相同名称的信号
             existing_signals = [config['name'] for config in self.parent_app.signal_configs]
@@ -414,6 +406,7 @@ class DBCPlugin:
                 return
             
             # 创建信号配置（格式必须与主程序add_signal一致）
+            # 信号显示名称已经在调用前生成，直接使用
             signal_config = {
                 'name': signal_display_name,
                 'can_id': can_id,  # 使用整数格式，不是字符串
@@ -514,9 +507,7 @@ class DBCPlugin:
         self.parent_app.signed_var.set(signal.value_type == 'signed')
         
         # 设置信号名
-        signal_display_name = f"{message.name}.{signal.name}"
-        if signal.unit:
-            signal_display_name += f" ({signal.unit})"
+        signal_display_name = signal.name
         
         self.parent_app.signal_name_var.set(signal_display_name)
         
